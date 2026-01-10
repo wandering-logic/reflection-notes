@@ -8,9 +8,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 npm run dev       # Start Vite dev server
 npm run build     # Type-check with tsc, then bundle with Vite
 npm run preview   # Preview production build
+npm run lint      # Check with Biome (linting + formatting)
+npm run lint:fix  # Auto-fix Biome issues
 ```
 
-No test runner or linter is currently configured.
+## Project Vision
+
+A PWA semantic notebook editor (like OneNote but with better math support, open file format, and clean HTML export). See README.md for details.
+
+**File format**: Each note is a directory containing ProseMirror JSON + assets. Notebooks are directory hierarchies.
 
 ## Architecture
 
