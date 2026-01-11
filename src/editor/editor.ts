@@ -7,8 +7,13 @@ import {
 import { history, redo, undo } from "prosemirror-history";
 import { keymap } from "prosemirror-keymap";
 import { Node } from "prosemirror-model";
-import { EditorState, Selection, type Transaction } from "prosemirror-state";
-import { EditorView } from "prosemirror-view";
+import {
+  EditorState,
+  Plugin,
+  Selection,
+  type Transaction,
+} from "prosemirror-state";
+import { Decoration, DecorationSet, EditorView } from "prosemirror-view";
 import { schema } from "./schema";
 
 const markKeymap = keymap({
@@ -85,13 +90,61 @@ const navigationKeymap = keymap({
   "Shift-Tab": shiftTabNavigation,
 });
 
-const plugins = [history(), markKeymap, navigationKeymap, keymap(baseKeymap)];
+// Placeholder plugin for empty title/subtitle
+const placeholderPlugin = new Plugin({
+  props: {
+    decorations(state) {
+      const decorations: Decoration[] = [];
+      const { doc } = state;
+
+      // Check title (first child)
+      const title = doc.child(0);
+      if (title.type.name === "title" && title.content.size === 0) {
+        decorations.push(
+          Decoration.node(0, title.nodeSize, {
+            class: "placeholder",
+            "data-placeholder": "Title",
+          }),
+        );
+      }
+
+      // Check subtitle (second child)
+      const subtitle = doc.child(1);
+      const subtitlePos = title.nodeSize;
+      if (subtitle.type.name === "subtitle" && subtitle.content.size === 0) {
+        decorations.push(
+          Decoration.node(subtitlePos, subtitlePos + subtitle.nodeSize, {
+            class: "placeholder",
+            "data-placeholder": "Subtitle",
+          }),
+        );
+      }
+
+      return DecorationSet.create(doc, decorations);
+    },
+  },
+});
+
+const plugins = [
+  history(),
+  markKeymap,
+  navigationKeymap,
+  placeholderPlugin,
+  keymap(baseKeymap),
+];
 
 // Change listeners per view
 const changeListeners = new WeakMap<EditorView, () => void>();
 
 export function mountEditor(host: HTMLElement): EditorView {
-  const state = EditorState.create({ schema, plugins });
+  // Create initial document with current timestamp
+  const doc = schema.nodes.doc.create(null, [
+    schema.nodes.title.create(),
+    schema.nodes.subtitle.create(),
+    schema.nodes.created.create({ timestamp: Date.now() }),
+    schema.nodes.paragraph.create(),
+  ]);
+  const state = EditorState.create({ schema, plugins, doc });
 
   const view = new EditorView(host, {
     state,
@@ -109,10 +162,18 @@ export function mountEditor(host: HTMLElement): EditorView {
 }
 
 export function setContent(view: EditorView, content: unknown): void {
-  const doc = content
-    ? Node.fromJSON(schema, content)
-    : schema.topNodeType.createAndFill();
-  if (!doc) throw new Error("Failed to create empty document");
+  let doc: Node;
+  if (content) {
+    doc = Node.fromJSON(schema, content);
+  } else {
+    // Create new document with current timestamp
+    doc = schema.nodes.doc.create(null, [
+      schema.nodes.title.create(),
+      schema.nodes.subtitle.create(),
+      schema.nodes.created.create({ timestamp: Date.now() }),
+      schema.nodes.paragraph.create(),
+    ]);
+  }
   const state = EditorState.create({ schema, plugins, doc });
   view.updateState(state);
 }

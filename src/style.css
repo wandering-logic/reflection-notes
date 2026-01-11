@@ -107,6 +107,7 @@ body {
 .ProseMirror {
   outline: none;
   min-height: 100%;
+  position: relative;
 }
 
 /* Title (h1) and Subtitle (h2) */
@@ -116,10 +117,15 @@ body {
   margin: 0 0 0.25em 0;
   border-bottom: 1px solid #ddd;
   padding-bottom: 0.25em;
+  position: relative;
 }
-.ProseMirror h1:empty::before {
-  content: "Untitled";
+.ProseMirror h1.placeholder::before {
+  content: attr(data-placeholder);
   color: #999;
+  pointer-events: none;
+  position: absolute;
+  top: 0;
+  left: 0;
 }
 .ProseMirror h2 {
   font-size: 1.2em;
@@ -128,10 +134,26 @@ body {
   margin: 0 0 1em 0;
   padding-bottom: 0.5em;
   border-bottom: 1px solid #eee;
+  position: relative;
 }
-.ProseMirror h2:empty::before {
-  content: "Subtitle";
+.ProseMirror h2.placeholder::before {
+  content: attr(data-placeholder);
   color: #bbb;
+  pointer-events: none;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+/* Document created timestamp */
+.ProseMirror .doc-created {
+  position: absolute;
+  top: 0;
+  right: 0;
+  font-size: 0.75em;
+  color: #888;
+  pointer-events: none;
+  user-select: none;
 }
 
 /* Section (h3), Subsection (h4), Subsubsection (h5) */

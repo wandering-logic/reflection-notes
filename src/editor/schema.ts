@@ -1,10 +1,23 @@
 import { Schema } from "prosemirror-model";
 import { marks, nodes } from "prosemirror-schema-basic";
 
+function formatTimestamp(ts: number): string {
+  const date = new Date(ts);
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZoneName: "short",
+  }).format(date);
+}
+
 export const schema = new Schema({
   nodes: {
     doc: {
-      content: "title subtitle block+",
+      content: "title subtitle created block+",
     },
     title: {
       content: "inline*",
@@ -20,6 +33,33 @@ export const schema = new Schema({
       parseDOM: [{ tag: "h2" }],
       toDOM() {
         return ["h2", 0];
+      },
+    },
+    created: {
+      attrs: { timestamp: { default: 0 } },
+      atom: true,
+      selectable: false,
+      parseDOM: [
+        {
+          tag: "time.doc-created",
+          getAttrs(dom) {
+            const el = dom as HTMLElement;
+            return { timestamp: parseInt(el.dataset.timestamp || "0", 10) };
+          },
+        },
+      ],
+      toDOM(node) {
+        const ts = node.attrs.timestamp as number;
+        const formatted = ts ? formatTimestamp(ts) : "";
+        return [
+          "time",
+          {
+            class: "doc-created",
+            "data-timestamp": String(ts),
+            datetime: ts ? new Date(ts).toISOString() : "",
+          },
+          formatted,
+        ];
       },
     },
     // Paragraph must come first in block group to be the default
