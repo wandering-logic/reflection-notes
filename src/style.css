@@ -24,6 +24,56 @@ body {
 }
 .menu {
   cursor: default;
+  position: relative;
+  padding: 4px 0;
+}
+.menu-dropdown {
+  display: none;
+  position: absolute;
+  top: calc(100% - 2px);
+  left: -8px;
+  padding-top: 2px;
+  background: white;
+  border: 1px solid #ddd;
+  min-width: 120px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+}
+.menu:hover .menu-dropdown {
+  display: block;
+}
+.menu-item {
+  padding: 6px 12px;
+}
+.menu-item:hover {
+  background: #f0f0f0;
+}
+.menu-separator {
+  height: 1px;
+  background: #ddd;
+  margin: 4px 0;
+}
+.has-submenu {
+  position: relative;
+}
+.has-submenu::after {
+  content: "›";
+  float: right;
+  margin-left: 12px;
+}
+.submenu {
+  display: none;
+  position: absolute;
+  top: -1px;
+  left: 100%;
+  background: white;
+  border: 1px solid #ddd;
+  min-width: 120px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  z-index: 1001;
+}
+.has-submenu:hover > .submenu {
+  display: block;
 }
 
 .body {

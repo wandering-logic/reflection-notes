@@ -8,10 +8,13 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "lint": "biome check src",
-    "lint:fix": "biome check --write src"
+    "lint:fix": "biome check --write src",
+    "check": "concurrently \"tsc --noEmit\" \"biome check src\"",
+    "check:watch": "concurrently \"tsc --watch --noEmit\" \"biome check --watch src\""
   },
   "devDependencies": {
     "@biomejs/biome": "^2.3.11",
+    "concurrently": "^9.2.1",
     "typescript": "~5.9.3",
     "vite": "^7.2.4"
   },
