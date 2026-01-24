@@ -10,7 +10,21 @@ This repo assumes a **local, per-user toolchain**:
 
 The goal is: **no global JS tooling required** beyond `node`/`npm` via `nvm`.
 
----
+## Intended workflow
+
+The goal is that in one terminal we can run
+```sh
+npm run dev
+```
+This starts a
+server for the app on `http://localhost:5173` that will give hot module
+replacement or page reloads when source is modified.
+
+The linter/formatter (`biome`) and TypeScript type checker can be run with
+```sh
+npm run check
+```
+
 
 ## Preconditions
 
