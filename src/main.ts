@@ -71,6 +71,7 @@ app.innerHTML = `
       </aside>
 
       <main class="editor-host">
+        <div class="format-indicator" id="format-indicator"></div>
         <div id="editor"></div>
       </main>
     </div>
@@ -240,5 +241,18 @@ function scheduleAutosave() {
 
 // Listen for editor changes
 Editor.onChange(view, scheduleAutosave);
+
+// Update format indicator when selection changes
+const formatIndicator =
+  document.querySelector<HTMLDivElement>("#format-indicator");
+
+function updateFormatIndicator() {
+  if (formatIndicator) {
+    formatIndicator.textContent = Editor.getBlockTypeName(view);
+  }
+}
+
+Editor.onSelectionChange(view, updateFormatIndicator);
+updateFormatIndicator(); // Initial update
 
 updateTitle();

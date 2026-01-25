@@ -136,6 +136,9 @@ const plugins = [
 // Change listeners per view
 const changeListeners = new WeakMap<EditorView, () => void>();
 
+// Selection change listeners per view
+const selectionListeners = new WeakMap<EditorView, () => void>();
+
 export function mountEditor(host: HTMLElement): EditorView {
   // Create initial document with current timestamp
   const doc = schema.nodes.doc.create(null, [
@@ -159,6 +162,11 @@ export function mountEditor(host: HTMLElement): EditorView {
 
       if (tr.docChanged) {
         const listener = changeListeners.get(view);
+        if (listener) listener();
+      }
+
+      if (tr.selectionSet || tr.docChanged) {
+        const listener = selectionListeners.get(view);
         if (listener) listener();
       }
     },
@@ -333,4 +341,46 @@ export function toggleCode(view: EditorView): boolean {
 
 export function toggleLink(view: EditorView, href: string): boolean {
   return toggleMark(schema.marks.link, { href })(view.state, view.dispatch);
+}
+
+export function onSelectionChange(view: EditorView, callback: () => void): void {
+  selectionListeners.set(view, callback);
+}
+
+export function getBlockTypeName(view: EditorView): string {
+  const { $from } = view.state.selection;
+
+  // Find the block node containing the cursor
+  // Walk up from the cursor to find the nearest block-level node
+  for (let depth = $from.depth; depth >= 0; depth--) {
+    const node = $from.node(depth);
+    const typeName = node.type.name;
+
+    switch (typeName) {
+      case "title":
+        return "Title";
+      case "subtitle":
+        return "Subtitle";
+      case "paragraph":
+        return "Paragraph";
+      case "section": {
+        const level = node.attrs.level as number;
+        if (level === 1) return "Section";
+        if (level === 2) return "Subsection";
+        if (level === 3) return "Subsubsection";
+        if (level === 4) return "Subsubsubsection";
+        return `Section ${level}`;
+      }
+      case "code_block":
+        return "Code Block";
+      case "blockquote":
+        return "Block Quote";
+      case "horizontal_rule":
+        return "Horizontal Rule";
+      case "created":
+        return "Created";
+    }
+  }
+
+  return "";
 }
