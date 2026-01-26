@@ -343,7 +343,10 @@ export function toggleLink(view: EditorView, href: string): boolean {
   return toggleMark(schema.marks.link, { href })(view.state, view.dispatch);
 }
 
-export function onSelectionChange(view: EditorView, callback: () => void): void {
+export function onSelectionChange(
+  view: EditorView,
+  callback: () => void,
+): void {
   selectionListeners.set(view, callback);
 }
 

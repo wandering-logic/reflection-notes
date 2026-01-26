@@ -1,14 +1,39 @@
 import "./style.css";
 import "prosemirror-view/style/prosemirror.css";
 import * as Editor from "./editor/editor";
-import * as Storage from "./storage/opfs";
+import {
+  type Commonbook,
+  createCommonbook,
+  openCommonbook,
+  restoreCommonbook,
+  saveCommonbookMeta,
+} from "./storage/commonbook";
+import {
+  createEntry,
+  type Entry,
+  extractTitle,
+  listEntries,
+  loadEntry,
+  saveEntry,
+} from "./storage/entry";
+import { LocalFileSystemProvider } from "./storage/filesystem";
 
-// Current document state
-let currentDocId: string | null = null;
-let currentDocName = "Untitled";
+// File system provider
+const fs = new LocalFileSystemProvider();
+
+// Current state
+let currentCommonbook: Commonbook | null = null;
+let currentEntry: Entry | null = null;
 
 function updateTitle() {
-  document.title = `${currentDocName} - Notebook`;
+  if (!currentCommonbook) {
+    document.title = "Notebook";
+    return;
+  }
+  const entryTitle = currentEntry
+    ? extractTitle(currentEntry.content)
+    : "Untitled";
+  document.title = `${entryTitle} - ${currentCommonbook.name}`;
 }
 
 const app = document.querySelector<HTMLDivElement>("#app");
@@ -20,9 +45,11 @@ app.innerHTML = `
       <div class="menu">
         File
         <div class="menu-dropdown">
-          <div class="menu-item" id="file-new">New</div>
-          <div class="menu-item" id="file-open">Open...</div>
-          <div class="menu-item" id="file-save-as">Save As...</div>
+          <div class="menu-item" id="file-new-entry">New Entry</div>
+          <div class="menu-item" id="file-open-entry">Open Entry...</div>
+          <div class="menu-separator"></div>
+          <div class="menu-item" id="file-new-commonbook">New Commonbook...</div>
+          <div class="menu-item" id="file-open-commonbook">Open Commonbook...</div>
         </div>
       </div>
       <div class="menu">
@@ -76,13 +103,23 @@ app.innerHTML = `
       </main>
     </div>
   </div>
+
+  <div class="welcome-dialog hidden" id="welcome-dialog">
+    <div class="welcome-content">
+      <h1>Welcome to Notebook</h1>
+      <p>Create a new commonbook or open an existing one to get started.</p>
+      <div class="welcome-buttons">
+        <button id="welcome-new">New Commonbook</button>
+        <button id="welcome-open">Open Commonbook</button>
+      </div>
+    </div>
+  </div>
 `;
 
 const editor = document.querySelector<HTMLDivElement>("#editor");
 if (!editor) throw new Error("#editor not found");
 
 const view = Editor.mountEditor(editor);
-view.focus();
 
 // Click in empty space below content should focus and move cursor to end
 editor.addEventListener("click", (e) => {
@@ -171,71 +208,198 @@ document.querySelector("#format-link")?.addEventListener("click", () => {
 });
 
 // File menu handlers
-document.querySelector("#file-new")?.addEventListener("click", async () => {
-  currentDocId = null;
-  currentDocName = "Untitled";
-  updateTitle();
-  Editor.setContent(view, null);
-  view.focus();
-});
 
-document.querySelector("#file-open")?.addEventListener("click", async () => {
-  const docs = await Storage.listDocuments();
-  if (docs.length === 0) {
-    alert("No saved documents.");
+async function handleNewEntry() {
+  if (!currentCommonbook) return;
+
+  // Save current entry first
+  await saveCurrentEntry();
+
+  // Create new entry
+  const entry = await createEntry(fs, currentCommonbook);
+  currentEntry = entry;
+
+  // Update commonbook meta
+  currentCommonbook.meta.lastOpenedEntry = entry.path;
+  await saveCommonbookMeta(fs, currentCommonbook);
+
+  // Load into editor
+  Editor.setContent(view, entry.content);
+  updateTitle();
+  view.focus();
+}
+
+async function handleOpenEntry() {
+  if (!currentCommonbook) return;
+
+  const entries = await listEntries(fs, currentCommonbook);
+  if (entries.length === 0) {
+    alert("No entries in this commonbook.");
     return;
   }
 
-  const choices = docs.map((d, i) => `${i + 1}. ${d.name}`).join("\n");
-  const choice = prompt(`Open document:\n${choices}\n\nEnter number:`);
+  // Format entry list for display
+  const formatDate = (ts: number) => {
+    if (!ts) return "Unknown date";
+    return new Date(ts).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  };
+
+  const choices = entries
+    .map((e, i) => {
+      const title =
+        e.title === "Untitled"
+          ? `Untitled - ${formatDate(e.created)}`
+          : e.title;
+      return `${i + 1}. ${title}`;
+    })
+    .join("\n");
+
+  const choice = prompt(`Open entry:\n${choices}\n\nEnter number:`);
   if (!choice) return;
 
   const index = parseInt(choice, 10) - 1;
-  if (index < 0 || index >= docs.length) {
+  if (index < 0 || index >= entries.length) {
     alert("Invalid choice.");
     return;
   }
 
-  const doc = docs[index];
-  const data = await Storage.loadDocument(doc.id);
-  if (data) {
-    currentDocId = doc.id;
-    currentDocName = doc.name;
-    updateTitle();
-    Editor.setContent(view, data.content);
-  }
-  view.focus();
-});
+  // Save current entry first
+  await saveCurrentEntry();
 
-document.querySelector("#file-save-as")?.addEventListener("click", async () => {
-  const name = prompt("Document name:", currentDocName);
-  if (!name) return;
+  // Load selected entry
+  const entryInfo = entries[index];
+  const entry = await loadEntry(fs, currentCommonbook, entryInfo.path);
+  currentEntry = entry;
 
-  const id = currentDocId ?? Storage.generateId();
-  const content = view.state.doc.toJSON();
-  await Storage.saveDocument(id, name, content);
+  // Update commonbook meta
+  currentCommonbook.meta.lastOpenedEntry = entry.path;
+  await saveCommonbookMeta(fs, currentCommonbook);
 
-  currentDocId = id;
-  currentDocName = name;
+  // Load into editor
+  Editor.setContent(view, entry.content);
   updateTitle();
   view.focus();
-});
+}
+
+async function handleNewCommonbook() {
+  try {
+    // Save current entry first
+    await saveCurrentEntry();
+
+    const { commonbook, entry } = await createCommonbook(fs);
+    currentCommonbook = commonbook;
+    currentEntry = entry;
+
+    Editor.setContent(view, entry.content);
+    updateTitle();
+    hideWelcomeDialog();
+    view.focus();
+  } catch (e) {
+    if (e instanceof Error) {
+      alert(e.message);
+    }
+  }
+}
+
+async function handleOpenCommonbook() {
+  try {
+    // Save current entry first
+    await saveCurrentEntry();
+
+    const commonbook = await openCommonbook(fs);
+    currentCommonbook = commonbook;
+
+    // Load last opened entry, or create a new one
+    if (commonbook.meta.lastOpenedEntry) {
+      try {
+        const entry = await loadEntry(
+          fs,
+          commonbook,
+          commonbook.meta.lastOpenedEntry,
+        );
+        currentEntry = entry;
+        Editor.setContent(view, entry.content);
+      } catch {
+        // Last entry doesn't exist, create a new one
+        const entry = await createEntry(fs, commonbook);
+        currentEntry = entry;
+        commonbook.meta.lastOpenedEntry = entry.path;
+        await saveCommonbookMeta(fs, commonbook);
+        Editor.setContent(view, entry.content);
+      }
+    } else {
+      // No last entry, create a new one
+      const entry = await createEntry(fs, commonbook);
+      currentEntry = entry;
+      commonbook.meta.lastOpenedEntry = entry.path;
+      await saveCommonbookMeta(fs, commonbook);
+      Editor.setContent(view, entry.content);
+    }
+
+    updateTitle();
+    hideWelcomeDialog();
+    view.focus();
+  } catch (e) {
+    if (e instanceof Error) {
+      alert(e.message);
+    }
+  }
+}
+
+async function saveCurrentEntry() {
+  if (!currentCommonbook || !currentEntry) return;
+
+  currentEntry.content = view.state.doc.toJSON();
+  await saveEntry(fs, currentCommonbook, currentEntry);
+}
+
+document
+  .querySelector("#file-new-entry")
+  ?.addEventListener("click", handleNewEntry);
+document
+  .querySelector("#file-open-entry")
+  ?.addEventListener("click", handleOpenEntry);
+document
+  .querySelector("#file-new-commonbook")
+  ?.addEventListener("click", handleNewCommonbook);
+document
+  .querySelector("#file-open-commonbook")
+  ?.addEventListener("click", handleOpenCommonbook);
+
+// Welcome dialog handlers
+document
+  .querySelector("#welcome-new")
+  ?.addEventListener("click", handleNewCommonbook);
+document
+  .querySelector("#welcome-open")
+  ?.addEventListener("click", handleOpenCommonbook);
+
+function showWelcomeDialog() {
+  document.querySelector("#welcome-dialog")?.classList.remove("hidden");
+}
+
+function hideWelcomeDialog() {
+  document.querySelector("#welcome-dialog")?.classList.add("hidden");
+}
 
 // Autosave: save after changes, debounced
 let autosaveTimeout: number | null = null;
 
 function scheduleAutosave() {
-  if (!currentDocId) return; // Don't autosave unsaved documents
+  if (!currentCommonbook || !currentEntry) return;
 
   if (autosaveTimeout) {
     clearTimeout(autosaveTimeout);
   }
 
   autosaveTimeout = window.setTimeout(async () => {
-    if (currentDocId) {
-      const content = view.state.doc.toJSON();
-      await Storage.saveDocument(currentDocId, currentDocName, content);
-    }
+    await saveCurrentEntry();
+    // Update title in case it changed
+    updateTitle();
   }, 1000);
 }
 
@@ -253,6 +417,55 @@ function updateFormatIndicator() {
 }
 
 Editor.onSelectionChange(view, updateFormatIndicator);
-updateFormatIndicator(); // Initial update
+updateFormatIndicator();
 
-updateTitle();
+// Startup: try to restore previous commonbook
+async function startup() {
+  const commonbook = await restoreCommonbook(fs);
+
+  if (commonbook) {
+    currentCommonbook = commonbook;
+
+    // Load last opened entry
+    if (commonbook.meta.lastOpenedEntry) {
+      try {
+        const entry = await loadEntry(
+          fs,
+          commonbook,
+          commonbook.meta.lastOpenedEntry,
+        );
+        currentEntry = entry;
+        Editor.setContent(view, entry.content);
+        updateTitle();
+        view.focus();
+        return;
+      } catch {
+        // Entry doesn't exist anymore, create a new one
+        const entry = await createEntry(fs, commonbook);
+        currentEntry = entry;
+        commonbook.meta.lastOpenedEntry = entry.path;
+        await saveCommonbookMeta(fs, commonbook);
+        Editor.setContent(view, entry.content);
+        updateTitle();
+        view.focus();
+        return;
+      }
+    } else {
+      // No last entry, create one
+      const entry = await createEntry(fs, commonbook);
+      currentEntry = entry;
+      commonbook.meta.lastOpenedEntry = entry.path;
+      await saveCommonbookMeta(fs, commonbook);
+      Editor.setContent(view, entry.content);
+      updateTitle();
+      view.focus();
+      return;
+    }
+  }
+
+  // No previous commonbook - show welcome dialog
+  showWelcomeDialog();
+  updateTitle();
+}
+
+startup();
