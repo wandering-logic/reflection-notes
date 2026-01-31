@@ -66,3 +66,12 @@ Strict mode is enabled. The build runs `tsc` for type-checking before Vite bundl
 ## Node Version
 
 Use Node v24.12.0 (specified in `.nvmrc`).
+
+## GitHub CLI
+
+Always use `--json` with `gh issue view` to avoid GraphQL deprecation errors:
+
+```bash
+gh issue view 17 --json title,body,state   # correct
+gh issue view 17                            # errors on projectCards field
+```
