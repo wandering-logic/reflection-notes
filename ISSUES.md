@@ -9,7 +9,6 @@ _Currently working on:_
 - #7 - Review schema (find what's missing from CommonMark)
 - #5 - Image support
 - #4 - Lists
-- #6 - Strikethrough
 - #8 - Toolbar and function keys
 - #17 - Links
 - #12 - PWA (boilerplate, may help with permission requests)
