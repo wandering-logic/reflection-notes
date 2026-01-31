@@ -339,6 +339,10 @@ export function toggleCode(view: EditorView): boolean {
   return toggleMark(schema.marks.code)(view.state, view.dispatch);
 }
 
+export function toggleStrikethrough(view: EditorView): boolean {
+  return toggleMark(schema.marks.strikethrough)(view.state, view.dispatch);
+}
+
 export function toggleLink(view: EditorView, href: string): boolean {
   return toggleMark(schema.marks.link, { href })(view.state, view.dispatch);
 }

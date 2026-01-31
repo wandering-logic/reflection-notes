@@ -103,6 +103,16 @@ export const schema = new Schema({
     em: marks.em,
     code: marks.code,
     link: marks.link,
-    // strikethrough: add later
+    strikethrough: {
+      parseDOM: [
+        { tag: "s" },
+        { tag: "del" },
+        { tag: "strike" },
+        { style: "text-decoration=line-through" },
+      ],
+      toDOM() {
+        return ["s", 0];
+      },
+    },
   },
 });
