@@ -1,6 +1,6 @@
 // Storage constants
 
-export const COMMONBOOK_FILE = "commonbook.json";
-export const ENTRY_FILE = "entry.json";
-export const HANDLE_STORAGE_KEY = "commonbook-handle";
-export const COMMONBOOK_VERSION = 1;
+export const NOTEBOOK_FILE = "notebook.json";
+export const NOTE_FILE = "note.json";
+export const HANDLE_STORAGE_KEY = "notebook-handle";
+export const NOTEBOOK_VERSION = 1;

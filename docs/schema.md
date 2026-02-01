@@ -89,8 +89,8 @@ These nodes are specific to the notebook application and don't correspond to Com
 
 | Node | HTML | Content | Marks | Purpose |
 |------|------|---------|-------|---------|
-| `title` | `<h1>` | `inline*` | none | Entry title (unformatted) |
-| `subtitle` | `<h2>` | `inline*` | `em` only | Entry subtitle (italic allowed) |
+| `title` | `<h1>` | `inline*` | none | Note title (unformatted) |
+| `subtitle` | `<h2>` | `inline*` | `em` only | Note subtitle (italic allowed) |
 | `created` | `<time>` | atom | — | Creation timestamp |
 
 ### Block Nodes

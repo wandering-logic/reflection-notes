@@ -16,7 +16,7 @@ npm run lint:fix  # Auto-fix Biome issues
 
 A PWA semantic notebook editor (like OneNote but with better math support, open file format, and clean HTML export). See README.md for details.
 
-**File format**: Each entry is a directory containing `entry.json` (ProseMirror JSON) + assets. Commonbooks are directories with `commonbook.json` metadata. See Storage Architecture below.
+**File format**: Each note is a directory containing `note.json` (ProseMirror JSON) + assets. Notebooks are directories with `notebook.json` metadata. See Storage Architecture below.
 
 ## Architecture
 
@@ -27,8 +27,8 @@ This is a rich text editor application built on ProseMirror. The editor uses Pro
 - `src/editor/editor.ts` - ProseMirror editor initialization and commands
 - `src/editor/schema.ts` - Document schema (title, subtitle, created, sections, etc.)
 - `src/storage/filesystem.ts` - FileSystemProvider interface + local implementation
-- `src/storage/commonbook.ts` - Commonbook operations
-- `src/storage/entry.ts` - Entry operations
+- `src/storage/notebook.ts` - Notebook operations
+- `src/storage/note.ts` - Note operations
 
 **Editor stack:**
 - `prosemirror-state` for editor state
@@ -40,24 +40,24 @@ This is a rich text editor application built on ProseMirror. The editor uses Pro
 ## Storage Architecture
 
 **Terminology:**
-- **Commonbook**: A collection of entries stored in a user-chosen directory. The app always has one commonbook open.
-- **Entry**: A single document within a commonbook, stored as ProseMirror JSON.
+- **Notebook**: A collection of notes stored in a user-chosen directory. The app always has one notebook open.
+- **Note**: A single document within a notebook, stored as ProseMirror JSON.
 
 **File structure:**
 ```
-MyCommonbook/                    # User-chosen directory (name = commonbook name)
-├── commonbook.json              # { version, lastOpenedEntry }
-└── 2026/01/26/1/                # Entry path: yyyy/mm/dd/n
-    └── entry.json               # ProseMirror document (contains title, created timestamp)
+MyNotebook/                      # User-chosen directory (name = notebook name)
+├── notebook.json                # { version, lastOpenedNote }
+└── 2026/01/26/1/                # Note path: yyyy/mm/dd/n
+    └── note.json                # ProseMirror document (contains title, created timestamp)
 ```
 
-The `yyyy/mm/dd/n` directory structure is an implementation detail to avoid huge flat directories. Users identify entries by title, not path.
+The `yyyy/mm/dd/n` directory structure is an implementation detail to avoid huge flat directories. Users identify notes by title, not path.
 
 **Design decisions:**
 - `FileSystemProvider` interface abstracts file operations. Currently implemented for File System Access API, designed to support cloud providers (Box, Dropbox, OneDrive, Google Drive) later.
 - Future: OPFS will serve as a cache layer that syncs with the "real" file system.
-- No entry index for MVP - entries are scanned on demand. Index can be added to `commonbook.json` later for performance.
-- Entry title is extracted from the ProseMirror document's first node (the `title` node), not stored redundantly.
+- No note index for MVP - notes are scanned on demand. Index can be added to `notebook.json` later for performance.
+- Note title is extracted from the ProseMirror document's first node (the `title` node), not stored redundantly.
 
 ## TypeScript
 

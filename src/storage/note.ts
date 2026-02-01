@@ -1,17 +1,17 @@
 import { schema } from "../editor/schema";
-import type { Commonbook } from "./commonbook";
-import { ENTRY_FILE } from "./constants";
+import { NOTE_FILE } from "./constants";
 import type { FileSystemProvider } from "./filesystem";
+import type { Notebook } from "./notebook";
 
-export interface Entry {
-  /** Path relative to commonbook root, e.g., "2026/01/26/1" */
+export interface Note {
+  /** Path relative to notebook root, e.g., "2026/01/26/1" */
   path: string;
   /** ProseMirror document JSON */
   content: unknown;
 }
 
-export interface EntryInfo {
-  /** Path relative to commonbook root */
+export interface NoteInfo {
+  /** Path relative to notebook root */
   path: string;
   /** Extracted from doc, or "Untitled" */
   title: string;
@@ -75,11 +75,11 @@ export function extractCreated(content: unknown): number {
 }
 
 /**
- * Generate a new entry path as yyyy/mm/dd/n.
+ * Generate a new note path as yyyy/mm/dd/n.
  */
-async function generateEntryPath(
+async function generateNotePath(
   fs: FileSystemProvider,
-  commonbook: Commonbook,
+  notebook: Notebook,
 ): Promise<string> {
   const now = new Date();
   const year = now.getFullYear().toString();
@@ -89,11 +89,11 @@ async function generateEntryPath(
   const datePath = `${year}/${month}/${day}`;
 
   // Create date directories if they don't exist
-  await fs.mkdir(commonbook.handle, datePath);
+  await fs.mkdir(notebook.handle, datePath);
 
   // Find next available number
   let n = 1;
-  while (await fs.exists(commonbook.handle, `${datePath}/${n}`)) {
+  while (await fs.exists(notebook.handle, `${datePath}/${n}`)) {
     n++;
   }
 
@@ -101,21 +101,21 @@ async function generateEntryPath(
 }
 
 /**
- * Create a new entry with blank content.
+ * Create a new note with blank content.
  * Generates path as yyyy/mm/dd/n where n is next available number.
  */
-export async function createEntry(
+export async function createNote(
   fs: FileSystemProvider,
-  commonbook: Commonbook,
-): Promise<Entry> {
-  const path = await generateEntryPath(fs, commonbook);
+  notebook: Notebook,
+): Promise<Note> {
+  const path = await generateNotePath(fs, notebook);
   const content = createBlankDocument(Date.now());
 
-  // Create the entry directory and write the file
-  await fs.mkdir(commonbook.handle, path);
+  // Create the note directory and write the file
+  await fs.mkdir(notebook.handle, path);
   await fs.writeTextFile(
-    commonbook.handle,
-    `${path}/${ENTRY_FILE}`,
+    notebook.handle,
+    `${path}/${NOTE_FILE}`,
     JSON.stringify(content, null, 2),
   );
 
@@ -123,54 +123,51 @@ export async function createEntry(
 }
 
 /**
- * Load entry content from disk.
+ * Load note content from disk.
  */
-export async function loadEntry(
+export async function loadNote(
   fs: FileSystemProvider,
-  commonbook: Commonbook,
+  notebook: Notebook,
   path: string,
-): Promise<Entry> {
-  const text = await fs.readTextFile(
-    commonbook.handle,
-    `${path}/${ENTRY_FILE}`,
-  );
+): Promise<Note> {
+  const text = await fs.readTextFile(notebook.handle, `${path}/${NOTE_FILE}`);
   const content = JSON.parse(text);
   return { path, content };
 }
 
 /**
- * Save entry content to disk.
+ * Save note content to disk.
  */
-export async function saveEntry(
+export async function saveNote(
   fs: FileSystemProvider,
-  commonbook: Commonbook,
-  entry: Entry,
+  notebook: Notebook,
+  note: Note,
 ): Promise<void> {
   await fs.writeTextFile(
-    commonbook.handle,
-    `${entry.path}/${ENTRY_FILE}`,
-    JSON.stringify(entry.content, null, 2),
+    notebook.handle,
+    `${note.path}/${NOTE_FILE}`,
+    JSON.stringify(note.content, null, 2),
   );
 }
 
 /**
- * List all entries in the commonbook.
- * Scans directory tree, reads each entry.json to extract title.
+ * List all notes in the notebook.
+ * Scans directory tree, reads each note.json to extract title.
  * Returns sorted by created date (newest first).
  */
-export async function listEntries(
+export async function listNotes(
   fs: FileSystemProvider,
-  commonbook: Commonbook,
-): Promise<EntryInfo[]> {
-  const entries: EntryInfo[] = [];
+  notebook: Notebook,
+): Promise<NoteInfo[]> {
+  const notes: NoteInfo[] = [];
 
   // Scan year directories
-  const years = await fs.listDir(commonbook.handle);
+  const years = await fs.listDir(notebook.handle);
   for (const year of years) {
     if (!year.isDirectory || !/^\d{4}$/.test(year.name)) continue;
 
     const yearHandle = await fs
-      .mkdir(commonbook.handle, year.name)
+      .mkdir(notebook.handle, year.name)
       .catch(() => null);
     if (!yearHandle) continue;
 
@@ -194,26 +191,26 @@ export async function listEntries(
           .catch(() => null);
         if (!dayHandle) continue;
 
-        // Scan entry directories
-        const entryDirs = await fs.listDir(dayHandle);
-        for (const entryDir of entryDirs) {
-          if (!entryDir.isDirectory) continue;
+        // Scan note directories
+        const noteDirs = await fs.listDir(dayHandle);
+        for (const noteDir of noteDirs) {
+          if (!noteDir.isDirectory) continue;
 
-          const entryPath = `${year.name}/${month.name}/${day.name}/${entryDir.name}`;
+          const notePath = `${year.name}/${month.name}/${day.name}/${noteDir.name}`;
 
           try {
             const text = await fs.readTextFile(
-              commonbook.handle,
-              `${entryPath}/${ENTRY_FILE}`,
+              notebook.handle,
+              `${notePath}/${NOTE_FILE}`,
             );
             const content = JSON.parse(text);
-            entries.push({
-              path: entryPath,
+            notes.push({
+              path: notePath,
               title: extractTitle(content),
               created: extractCreated(content),
             });
           } catch {
-            // Skip directories without valid entry.json
+            // Skip directories without valid note.json
           }
         }
       }
@@ -221,5 +218,5 @@ export async function listEntries(
   }
 
   // Sort by created date, newest first
-  return entries.sort((a, b) => b.created - a.created);
+  return notes.sort((a, b) => b.created - a.created);
 }

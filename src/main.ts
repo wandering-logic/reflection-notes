@@ -1,41 +1,41 @@
 import "./style.css";
 import "prosemirror-view/style/prosemirror.css";
 import * as Editor from "./editor/editor";
-import {
-  type Commonbook,
-  createCommonbook,
-  openCommonbook,
-  reconnectCommonbook,
-  restoreCommonbook,
-  saveCommonbookMeta,
-} from "./storage/commonbook";
-import {
-  createEntry,
-  type Entry,
-  extractTitle,
-  listEntries,
-  loadEntry,
-  saveEntry,
-} from "./storage/entry";
 import { LocalFileSystemProvider } from "./storage/filesystem";
+import {
+  createNote,
+  extractTitle,
+  listNotes,
+  loadNote,
+  type Note,
+  saveNote,
+} from "./storage/note";
+import {
+  createNotebook,
+  type Notebook,
+  openNotebook,
+  reconnectNotebook,
+  restoreNotebook,
+  saveNotebookMeta,
+} from "./storage/notebook";
 
 // File system provider
 const fs = new LocalFileSystemProvider();
 
 // Current state
-let currentCommonbook: Commonbook | null = null;
-let currentEntry: Entry | null = null;
+let currentNotebook: Notebook | null = null;
+let currentNote: Note | null = null;
 let pendingReconnectHandle: FileSystemDirectoryHandle | null = null;
 
 function updateTitle() {
-  if (!currentCommonbook) {
-    document.title = "Notebook";
+  if (!currentNotebook) {
+    document.title = "Reflection Notes";
     return;
   }
-  const entryTitle = currentEntry
-    ? extractTitle(currentEntry.content)
+  const noteTitle = currentNote
+    ? extractTitle(currentNote.content)
     : "Untitled";
-  document.title = `${entryTitle} - ${currentCommonbook.name}`;
+  document.title = `${noteTitle} - ${currentNotebook.name}`;
 }
 
 const app = document.querySelector<HTMLDivElement>("#app");
@@ -47,11 +47,11 @@ app.innerHTML = `
       <div class="menu">
         File
         <div class="menu-dropdown">
-          <div class="menu-item" id="file-new-entry">New Entry</div>
-          <div class="menu-item" id="file-open-entry">Open Entry...</div>
+          <div class="menu-item" id="file-new-note">New Note</div>
+          <div class="menu-item" id="file-open-note">Open Note...</div>
           <div class="menu-separator"></div>
-          <div class="menu-item" id="file-new-commonbook">New Commonbook...</div>
-          <div class="menu-item" id="file-open-commonbook">Open Commonbook...</div>
+          <div class="menu-item" id="file-new-notebook">New Notebook...</div>
+          <div class="menu-item" id="file-open-notebook">Open Notebook...</div>
         </div>
       </div>
       <div class="menu">
@@ -108,23 +108,23 @@ app.innerHTML = `
 
   <div class="welcome-dialog hidden" id="welcome-dialog">
     <div class="welcome-content">
-      <h1>Welcome to Notebook</h1>
-      <p>Create a new commonbook or open an existing one to get started.</p>
+      <h1>Welcome to Reflection Notes</h1>
+      <p>Create a new notebook or open an existing one to get started.</p>
       <div class="welcome-buttons">
-        <button id="welcome-new">New Commonbook</button>
-        <button id="welcome-open">Open Commonbook</button>
+        <button id="welcome-new">New Notebook</button>
+        <button id="welcome-open">Open Notebook</button>
       </div>
     </div>
   </div>
 
   <div class="welcome-dialog hidden" id="reconnect-dialog">
     <div class="welcome-content">
-      <h1>Reconnect to Commonbook</h1>
+      <h1>Reconnect to Notebook</h1>
       <p>Click below to reconnect to <strong id="reconnect-name"></strong>.</p>
       <p class="reconnect-hint">Install as an app to skip this step in the future.</p>
       <div class="welcome-buttons">
         <button id="reconnect-button">Reconnect</button>
-        <button id="reconnect-different">Open Different Commonbook</button>
+        <button id="reconnect-different">Open Different Notebook</button>
       </div>
     </div>
   </div>
@@ -223,36 +223,36 @@ document.querySelector("#format-link")?.addEventListener("click", () => {
 
 // File menu handlers
 
-async function handleNewEntry() {
-  if (!currentCommonbook) return;
+async function handleNewNote() {
+  if (!currentNotebook) return;
 
-  // Save current entry first
-  await saveCurrentEntry();
+  // Save current note first
+  await saveCurrentNote();
 
-  // Create new entry
-  const entry = await createEntry(fs, currentCommonbook);
-  currentEntry = entry;
+  // Create new note
+  const note = await createNote(fs, currentNotebook);
+  currentNote = note;
 
-  // Update commonbook meta
-  currentCommonbook.meta.lastOpenedEntry = entry.path;
-  await saveCommonbookMeta(fs, currentCommonbook);
+  // Update notebook meta
+  currentNotebook.meta.lastOpenedNote = note.path;
+  await saveNotebookMeta(fs, currentNotebook);
 
   // Load into editor
-  Editor.setContent(view, entry.content);
+  Editor.setContent(view, note.content);
   updateTitle();
   view.focus();
 }
 
-async function handleOpenEntry() {
-  if (!currentCommonbook) return;
+async function handleOpenNote() {
+  if (!currentNotebook) return;
 
-  const entries = await listEntries(fs, currentCommonbook);
-  if (entries.length === 0) {
-    alert("No entries in this commonbook.");
+  const notes = await listNotes(fs, currentNotebook);
+  if (notes.length === 0) {
+    alert("No notes in this notebook.");
     return;
   }
 
-  // Format entry list for display
+  // Format note list for display
   const formatDate = (ts: number) => {
     if (!ts) return "Unknown date";
     return new Date(ts).toLocaleDateString("en-US", {
@@ -262,7 +262,7 @@ async function handleOpenEntry() {
     });
   };
 
-  const choices = entries
+  const choices = notes
     .map((e, i) => {
       const title =
         e.title === "Untitled"
@@ -272,43 +272,43 @@ async function handleOpenEntry() {
     })
     .join("\n");
 
-  const choice = prompt(`Open entry:\n${choices}\n\nEnter number:`);
+  const choice = prompt(`Open note:\n${choices}\n\nEnter number:`);
   if (!choice) return;
 
   const index = parseInt(choice, 10) - 1;
-  if (index < 0 || index >= entries.length) {
+  if (index < 0 || index >= notes.length) {
     alert("Invalid choice.");
     return;
   }
 
-  // Save current entry first
-  await saveCurrentEntry();
+  // Save current note first
+  await saveCurrentNote();
 
-  // Load selected entry
-  const entryInfo = entries[index];
-  const entry = await loadEntry(fs, currentCommonbook, entryInfo.path);
-  currentEntry = entry;
+  // Load selected note
+  const noteInfo = notes[index];
+  const note = await loadNote(fs, currentNotebook, noteInfo.path);
+  currentNote = note;
 
-  // Update commonbook meta
-  currentCommonbook.meta.lastOpenedEntry = entry.path;
-  await saveCommonbookMeta(fs, currentCommonbook);
+  // Update notebook meta
+  currentNotebook.meta.lastOpenedNote = note.path;
+  await saveNotebookMeta(fs, currentNotebook);
 
   // Load into editor
-  Editor.setContent(view, entry.content);
+  Editor.setContent(view, note.content);
   updateTitle();
   view.focus();
 }
 
-async function handleNewCommonbook() {
+async function handleNewNotebook() {
   try {
-    // Save current entry first
-    await saveCurrentEntry();
+    // Save current note first
+    await saveCurrentNote();
 
-    const { commonbook, entry } = await createCommonbook(fs);
-    currentCommonbook = commonbook;
-    currentEntry = entry;
+    const { notebook, note } = await createNotebook(fs);
+    currentNotebook = notebook;
+    currentNote = note;
 
-    Editor.setContent(view, entry.content);
+    Editor.setContent(view, note.content);
     updateTitle();
     hideWelcomeDialog();
     view.focus();
@@ -319,39 +319,35 @@ async function handleNewCommonbook() {
   }
 }
 
-async function handleOpenCommonbook() {
+async function handleOpenNotebook() {
   try {
-    // Save current entry first
-    await saveCurrentEntry();
+    // Save current note first
+    await saveCurrentNote();
 
-    const commonbook = await openCommonbook(fs);
-    currentCommonbook = commonbook;
+    const notebook = await openNotebook(fs);
+    currentNotebook = notebook;
 
-    // Load last opened entry, or create a new one
-    if (commonbook.meta.lastOpenedEntry) {
+    // Load last opened note, or create a new one
+    if (notebook.meta.lastOpenedNote) {
       try {
-        const entry = await loadEntry(
-          fs,
-          commonbook,
-          commonbook.meta.lastOpenedEntry,
-        );
-        currentEntry = entry;
-        Editor.setContent(view, entry.content);
+        const note = await loadNote(fs, notebook, notebook.meta.lastOpenedNote);
+        currentNote = note;
+        Editor.setContent(view, note.content);
       } catch {
-        // Last entry doesn't exist, create a new one
-        const entry = await createEntry(fs, commonbook);
-        currentEntry = entry;
-        commonbook.meta.lastOpenedEntry = entry.path;
-        await saveCommonbookMeta(fs, commonbook);
-        Editor.setContent(view, entry.content);
+        // Last note doesn't exist, create a new one
+        const note = await createNote(fs, notebook);
+        currentNote = note;
+        notebook.meta.lastOpenedNote = note.path;
+        await saveNotebookMeta(fs, notebook);
+        Editor.setContent(view, note.content);
       }
     } else {
-      // No last entry, create a new one
-      const entry = await createEntry(fs, commonbook);
-      currentEntry = entry;
-      commonbook.meta.lastOpenedEntry = entry.path;
-      await saveCommonbookMeta(fs, commonbook);
-      Editor.setContent(view, entry.content);
+      // No last note, create a new one
+      const note = await createNote(fs, notebook);
+      currentNote = note;
+      notebook.meta.lastOpenedNote = note.path;
+      await saveNotebookMeta(fs, notebook);
+      Editor.setContent(view, note.content);
     }
 
     updateTitle();
@@ -364,33 +360,33 @@ async function handleOpenCommonbook() {
   }
 }
 
-async function saveCurrentEntry() {
-  if (!currentCommonbook || !currentEntry) return;
+async function saveCurrentNote() {
+  if (!currentNotebook || !currentNote) return;
 
-  currentEntry.content = view.state.doc.toJSON();
-  await saveEntry(fs, currentCommonbook, currentEntry);
+  currentNote.content = view.state.doc.toJSON();
+  await saveNote(fs, currentNotebook, currentNote);
 }
 
 document
-  .querySelector("#file-new-entry")
-  ?.addEventListener("click", handleNewEntry);
+  .querySelector("#file-new-note")
+  ?.addEventListener("click", handleNewNote);
 document
-  .querySelector("#file-open-entry")
-  ?.addEventListener("click", handleOpenEntry);
+  .querySelector("#file-open-note")
+  ?.addEventListener("click", handleOpenNote);
 document
-  .querySelector("#file-new-commonbook")
-  ?.addEventListener("click", handleNewCommonbook);
+  .querySelector("#file-new-notebook")
+  ?.addEventListener("click", handleNewNotebook);
 document
-  .querySelector("#file-open-commonbook")
-  ?.addEventListener("click", handleOpenCommonbook);
+  .querySelector("#file-open-notebook")
+  ?.addEventListener("click", handleOpenNotebook);
 
 // Welcome dialog handlers
 document
   .querySelector("#welcome-new")
-  ?.addEventListener("click", handleNewCommonbook);
+  ?.addEventListener("click", handleNewNotebook);
 document
   .querySelector("#welcome-open")
-  ?.addEventListener("click", handleOpenCommonbook);
+  ?.addEventListener("click", handleOpenNotebook);
 
 // Reconnect dialog handlers
 document
@@ -422,42 +418,38 @@ async function handleReconnect() {
   if (!pendingReconnectHandle) return;
 
   try {
-    const commonbook = await reconnectCommonbook(fs, pendingReconnectHandle);
-    if (!commonbook) {
+    const notebook = await reconnectNotebook(fs, pendingReconnectHandle);
+    if (!notebook) {
       alert(
-        "Permission denied. Please try again or open a different commonbook.",
+        "Permission denied. Please try again or open a different notebook.",
       );
       return;
     }
 
     pendingReconnectHandle = null;
-    currentCommonbook = commonbook;
+    currentNotebook = notebook;
 
-    // Load last opened entry, or create a new one
-    if (commonbook.meta.lastOpenedEntry) {
+    // Load last opened note, or create a new one
+    if (notebook.meta.lastOpenedNote) {
       try {
-        const entry = await loadEntry(
-          fs,
-          commonbook,
-          commonbook.meta.lastOpenedEntry,
-        );
-        currentEntry = entry;
-        Editor.setContent(view, entry.content);
+        const note = await loadNote(fs, notebook, notebook.meta.lastOpenedNote);
+        currentNote = note;
+        Editor.setContent(view, note.content);
       } catch {
-        // Last entry doesn't exist, create a new one
-        const entry = await createEntry(fs, commonbook);
-        currentEntry = entry;
-        commonbook.meta.lastOpenedEntry = entry.path;
-        await saveCommonbookMeta(fs, commonbook);
-        Editor.setContent(view, entry.content);
+        // Last note doesn't exist, create a new one
+        const note = await createNote(fs, notebook);
+        currentNote = note;
+        notebook.meta.lastOpenedNote = note.path;
+        await saveNotebookMeta(fs, notebook);
+        Editor.setContent(view, note.content);
       }
     } else {
-      // No last entry, create a new one
-      const entry = await createEntry(fs, commonbook);
-      currentEntry = entry;
-      commonbook.meta.lastOpenedEntry = entry.path;
-      await saveCommonbookMeta(fs, commonbook);
-      Editor.setContent(view, entry.content);
+      // No last note, create a new one
+      const note = await createNote(fs, notebook);
+      currentNote = note;
+      notebook.meta.lastOpenedNote = note.path;
+      await saveNotebookMeta(fs, notebook);
+      Editor.setContent(view, note.content);
     }
 
     updateTitle();
@@ -473,21 +465,21 @@ async function handleReconnect() {
 async function handleReconnectDifferent() {
   pendingReconnectHandle = null;
   hideReconnectDialog();
-  await handleOpenCommonbook();
+  await handleOpenNotebook();
 }
 
 // Autosave: save after changes, debounced
 let autosaveTimeout: number | null = null;
 
 function scheduleAutosave() {
-  if (!currentCommonbook || !currentEntry) return;
+  if (!currentNotebook || !currentNote) return;
 
   if (autosaveTimeout) {
     clearTimeout(autosaveTimeout);
   }
 
   autosaveTimeout = window.setTimeout(async () => {
-    await saveCurrentEntry();
+    await saveCurrentNote();
     // Update title in case it changed
     updateTitle();
   }, 1000);
@@ -509,62 +501,58 @@ function updateFormatIndicator() {
 Editor.onSelectionChange(view, updateFormatIndicator);
 updateFormatIndicator();
 
-// Startup: try to restore previous commonbook
+// Startup: try to restore previous notebook
 async function startup() {
-  const result = await restoreCommonbook(fs);
+  const result = await restoreNotebook(fs);
 
   if (result) {
-    const { commonbook, needsPermission } = result;
+    const { notebook, needsPermission } = result;
 
     // If permission is needed, show reconnect dialog
     if (needsPermission) {
-      pendingReconnectHandle = commonbook.handle;
-      showReconnectDialog(commonbook.name);
+      pendingReconnectHandle = notebook.handle;
+      showReconnectDialog(notebook.name);
       updateTitle();
       return;
     }
 
     // Permission granted - load normally
-    currentCommonbook = commonbook;
+    currentNotebook = notebook;
 
-    // Load last opened entry
-    if (commonbook.meta.lastOpenedEntry) {
+    // Load last opened note
+    if (notebook.meta.lastOpenedNote) {
       try {
-        const entry = await loadEntry(
-          fs,
-          commonbook,
-          commonbook.meta.lastOpenedEntry,
-        );
-        currentEntry = entry;
-        Editor.setContent(view, entry.content);
+        const note = await loadNote(fs, notebook, notebook.meta.lastOpenedNote);
+        currentNote = note;
+        Editor.setContent(view, note.content);
         updateTitle();
         view.focus();
         return;
       } catch {
-        // Entry doesn't exist anymore, create a new one
-        const entry = await createEntry(fs, commonbook);
-        currentEntry = entry;
-        commonbook.meta.lastOpenedEntry = entry.path;
-        await saveCommonbookMeta(fs, commonbook);
-        Editor.setContent(view, entry.content);
+        // Note doesn't exist anymore, create a new one
+        const note = await createNote(fs, notebook);
+        currentNote = note;
+        notebook.meta.lastOpenedNote = note.path;
+        await saveNotebookMeta(fs, notebook);
+        Editor.setContent(view, note.content);
         updateTitle();
         view.focus();
         return;
       }
     } else {
-      // No last entry, create one
-      const entry = await createEntry(fs, commonbook);
-      currentEntry = entry;
-      commonbook.meta.lastOpenedEntry = entry.path;
-      await saveCommonbookMeta(fs, commonbook);
-      Editor.setContent(view, entry.content);
+      // No last note, create one
+      const note = await createNote(fs, notebook);
+      currentNote = note;
+      notebook.meta.lastOpenedNote = note.path;
+      await saveNotebookMeta(fs, notebook);
+      Editor.setContent(view, note.content);
       updateTitle();
       view.focus();
       return;
     }
   }
 
-  // No previous commonbook - show welcome dialog
+  // No previous notebook - show welcome dialog
   showWelcomeDialog();
   updateTitle();
 }

@@ -35,9 +35,7 @@ export interface FileSystemProvider {
   persistHandle(key: string, handle: FileSystemDirectoryHandle): Promise<void>;
 
   /** Retrieve persisted handle without requesting permission */
-  getPersistedHandle(
-    key: string,
-  ): Promise<{
+  getPersistedHandle(key: string): Promise<{
     handle: FileSystemDirectoryHandle;
     needsPermission: boolean;
   } | null>;
@@ -152,9 +150,7 @@ export class LocalFileSystemProvider implements FileSystemProvider {
     });
   }
 
-  async getPersistedHandle(
-    key: string,
-  ): Promise<{
+  async getPersistedHandle(key: string): Promise<{
     handle: FileSystemDirectoryHandle;
     needsPermission: boolean;
   } | null> {
