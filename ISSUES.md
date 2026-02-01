@@ -1,6 +1,6 @@
 # Issues
 
-Current focus and prioritized backlog. Full details in [GitHub Issues](https://github.com/wandering-logic/reflection-notebook/issues).
+Current focus and prioritized backlog. Full details in [GitHub Issues](https://github.com/wandering-logic/reflection-notes/issues).
 
 ## Active Focus
 
@@ -36,7 +36,7 @@ _Lower priority:_
 - #19 - Footnotes/sidenotes
 - #18 - Anchors
 - #16 - Labels
-- #13 - Reflection Notebook or Reflection Notes?
+- #13 - ~~Reflection Notebook or Reflection Notes?~~ (decided: Reflection Notes)
 - #14 - Normalize names of notebooks/notes
 - #11 - Cloud storage
 - #21 - Indexing
