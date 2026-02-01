@@ -1,4 +1,7 @@
-# Reflection Notes - a Semantic Notebook webapp
+# [Reflection Notes](https://reflection-notes.wanderinglogic.com/) - a Semantic Notebook webapp
+
+The app is served through github pages at https://reflection-notes.wanderinglogic.com/.
+Please try it out and let me know what you think!
 
 This will hopefully eventually be a full progressive web app that supports
 editing rich text documents with semantic structure (paragraphs, headings,
