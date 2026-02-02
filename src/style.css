@@ -76,6 +76,66 @@ body {
   display: block;
 }
 
+/* Toolbar */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border-bottom: 1px solid #ddd;
+  background: #fafafa;
+  user-select: none;
+}
+.toolbar-group {
+  display: flex;
+  gap: 2px;
+}
+.toolbar-separator {
+  width: 1px;
+  height: 24px;
+  background: #ddd;
+  margin: 0 8px;
+}
+.toolbar-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  color: #444;
+}
+.toolbar-btn:hover {
+  background: #f0f0f0;
+  border-color: #ddd;
+}
+.toolbar-btn.active {
+  background: #e0e0e0;
+  border-color: #ccc;
+  color: #000;
+}
+.toolbar-btn:disabled {
+  color: #bbb;
+  cursor: default;
+}
+.toolbar-btn:disabled:hover {
+  background: transparent;
+  border-color: transparent;
+}
+.toolbar-btn svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 .body {
   flex: 1;
   display: flex;

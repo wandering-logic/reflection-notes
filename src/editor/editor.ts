@@ -393,3 +393,54 @@ export function getBlockTypeName(view: EditorView): string {
 
   return "";
 }
+
+export interface ActiveMarks {
+  strong: boolean;
+  em: boolean;
+  code: boolean;
+  strikethrough: boolean;
+  link: boolean;
+}
+
+export function getActiveMarks(view: EditorView): ActiveMarks {
+  const { state } = view;
+  const { from, $from, to, empty } = state.selection;
+
+  const result: ActiveMarks = {
+    strong: false,
+    em: false,
+    code: false,
+    strikethrough: false,
+    link: false,
+  };
+
+  if (empty) {
+    // Cursor position (no selection) - check stored marks or marks at position
+    const storedMarks = state.storedMarks;
+    const marks = storedMarks || $from.marks();
+
+    for (const mark of marks) {
+      if (mark.type === schema.marks.strong) result.strong = true;
+      if (mark.type === schema.marks.em) result.em = true;
+      if (mark.type === schema.marks.code) result.code = true;
+      if (mark.type === schema.marks.strikethrough) result.strikethrough = true;
+      if (mark.type === schema.marks.link) result.link = true;
+    }
+  } else {
+    // Selection range - check if mark exists anywhere in the selection
+    state.doc.nodesBetween(from, to, (node) => {
+      if (node.isText && node.marks) {
+        for (const mark of node.marks) {
+          if (mark.type === schema.marks.strong) result.strong = true;
+          if (mark.type === schema.marks.em) result.em = true;
+          if (mark.type === schema.marks.code) result.code = true;
+          if (mark.type === schema.marks.strikethrough)
+            result.strikethrough = true;
+          if (mark.type === schema.marks.link) result.link = true;
+        }
+      }
+    });
+  }
+
+  return result;
+}

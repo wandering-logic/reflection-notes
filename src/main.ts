@@ -122,6 +122,62 @@ app.innerHTML = `
       <div class="menu">Help</div>
     </header>
 
+    <div class="toolbar" id="toolbar">
+      <div class="toolbar-group">
+        <button class="toolbar-btn" id="tb-bold" title="Bold">
+          <svg viewBox="0 0 24 24"><path d="M7 5h6a3.5 3.5 0 0 1 0 7h-6z"/><path d="M13 12h1a3.5 3.5 0 0 1 0 7h-7v-7"/></svg>
+        </button>
+        <button class="toolbar-btn" id="tb-italic" title="Italic">
+          <svg viewBox="0 0 24 24"><path d="M11 5l6 0"/><path d="M7 19l6 0"/><path d="M14 5l-4 14"/></svg>
+        </button>
+        <button class="toolbar-btn" id="tb-code" title="Code">
+          <svg viewBox="0 0 24 24"><path d="M7 8l-4 4l4 4"/><path d="M17 8l4 4l-4 4"/><path d="M14 4l-4 16"/></svg>
+        </button>
+        <button class="toolbar-btn" id="tb-strikethrough" title="Strikethrough">
+          <svg viewBox="0 0 24 24"><path d="M5 12l14 0"/><path d="M16 6.5a4 2 0 0 0 -4 -1.5h-1a3.5 3.5 0 0 0 0 7h2a3.5 3.5 0 0 1 0 7h-1.5a4 2 0 0 1 -4 -1.5"/></svg>
+        </button>
+        <button class="toolbar-btn" id="tb-link" title="Link">
+          <svg viewBox="0 0 24 24"><path d="M9 15l6 -6"/><path d="M11 6l.463 -.536a5 5 0 0 1 7.071 7.072l-.534 .464"/><path d="M13 18l-.397 .534a5.068 5.068 0 0 1 -7.127 0a4.972 4.972 0 0 1 0 -7.071l.524 -.463"/></svg>
+        </button>
+      </div>
+      <div class="toolbar-separator"></div>
+      <div class="toolbar-group">
+        <button class="toolbar-btn" id="tb-paragraph" title="Paragraph">
+          <svg viewBox="0 0 24 24"><path d="M13 4v16"/><path d="M17 4v16"/><path d="M19 4h-9.5a4.5 4.5 0 0 0 0 9h3.5"/></svg>
+        </button>
+        <button class="toolbar-btn" id="tb-h1" title="Section">
+          <svg viewBox="0 0 24 24"><path d="M7 12h10"/><path d="M7 5v14"/><path d="M17 5v14"/><path d="M15 19h4"/><path d="M15 5h4"/><path d="M5 19h4"/><path d="M5 5h4"/></svg>
+        </button>
+        <button class="toolbar-btn" id="tb-h2" title="Subsection">
+          <svg viewBox="0 0 24 24"><path d="M17 12a2 2 0 1 1 4 0c0 .591 -.417 1.318 -.816 1.858l-3.184 4.143l4 0"/><path d="M4 6v12"/><path d="M12 6v12"/><path d="M11 18h2"/><path d="M3 18h2"/><path d="M4 12h8"/><path d="M3 6h2"/><path d="M11 6h2"/></svg>
+        </button>
+        <button class="toolbar-btn" id="tb-h3" title="Subsubsection">
+          <svg viewBox="0 0 24 24"><path d="M19 14a2 2 0 1 0 -2 -2"/><path d="M17 16a2 2 0 1 0 2 -2"/><path d="M4 6v12"/><path d="M12 6v12"/><path d="M11 18h2"/><path d="M3 18h2"/><path d="M4 12h8"/><path d="M3 6h2"/><path d="M11 6h2"/></svg>
+        </button>
+        <button class="toolbar-btn" id="tb-h4" title="Subsubsubsection">
+          <svg viewBox="0 0 24 24"><path d="M20 18v-8l-4 6h5"/><path d="M4 6v12"/><path d="M12 6v12"/><path d="M11 18h2"/><path d="M3 18h2"/><path d="M4 12h8"/><path d="M3 6h2"/><path d="M11 6h2"/></svg>
+        </button>
+        <button class="toolbar-btn" id="tb-blockquote" title="Block Quote">
+          <svg viewBox="0 0 24 24"><path d="M6 15h15"/><path d="M21 19h-15"/><path d="M15 11h6"/><path d="M21 7h-6"/><path d="M9 9h1a1 1 0 1 1 -1 1v-2.5a2 2 0 0 1 2 -2"/><path d="M3 9h1a1 1 0 1 1 -1 1v-2.5a2 2 0 0 1 2 -2"/></svg>
+        </button>
+        <button class="toolbar-btn" id="tb-code-block" title="Code Block">
+          <svg viewBox="0 0 24 24"><path d="M14.5 4h2.5a3 3 0 0 1 3 3v10a3 3 0 0 1 -3 3h-10a3 3 0 0 1 -3 -3v-5"/><path d="M6 5l-2 2l2 2"/><path d="M10 9l2 -2l-2 -2"/></svg>
+        </button>
+        <button class="toolbar-btn" id="tb-hr" title="Horizontal Rule">
+          <svg viewBox="0 0 24 24"><path d="M4 12l16 0"/><path d="M8 8l4 -4l4 4"/><path d="M16 16l-4 4l-4 -4"/></svg>
+        </button>
+      </div>
+      <div class="toolbar-separator"></div>
+      <div class="toolbar-group">
+        <button class="toolbar-btn" id="tb-undo" title="Undo">
+          <svg viewBox="0 0 24 24"><path d="M9 14l-4 -4l4 -4"/><path d="M5 10h11a4 4 0 1 1 0 8h-1"/></svg>
+        </button>
+        <button class="toolbar-btn" id="tb-redo" title="Redo">
+          <svg viewBox="0 0 24 24"><path d="M15 14l4 -4l-4 -4"/><path d="M19 10h-11a4 4 0 1 0 0 8h1"/></svg>
+        </button>
+      </div>
+    </div>
+
     <div class="body">
       <aside class="sidebar hidden" id="sidebar">
         <div class="sidebar-title">Notebook</div>
@@ -246,6 +302,87 @@ document.querySelector("#format-link")?.addEventListener("click", () => {
   if (href) {
     Editor.toggleLink(view, href);
   }
+  view.focus();
+});
+
+// Toolbar - inline marks
+document.querySelector("#tb-bold")?.addEventListener("click", () => {
+  Editor.toggleStrong(view);
+  view.focus();
+});
+
+document.querySelector("#tb-italic")?.addEventListener("click", () => {
+  Editor.toggleEm(view);
+  view.focus();
+});
+
+document.querySelector("#tb-code")?.addEventListener("click", () => {
+  Editor.toggleCode(view);
+  view.focus();
+});
+
+document.querySelector("#tb-strikethrough")?.addEventListener("click", () => {
+  Editor.toggleStrikethrough(view);
+  view.focus();
+});
+
+document.querySelector("#tb-link")?.addEventListener("click", () => {
+  const href = prompt("Enter URL:");
+  if (href) {
+    Editor.toggleLink(view, href);
+  }
+  view.focus();
+});
+
+// Toolbar - block types
+document.querySelector("#tb-paragraph")?.addEventListener("click", () => {
+  Editor.setParagraph(view);
+  view.focus();
+});
+
+document.querySelector("#tb-h1")?.addEventListener("click", () => {
+  Editor.setSection(view, 1);
+  view.focus();
+});
+
+document.querySelector("#tb-h2")?.addEventListener("click", () => {
+  Editor.setSection(view, 2);
+  view.focus();
+});
+
+document.querySelector("#tb-h3")?.addEventListener("click", () => {
+  Editor.setSection(view, 3);
+  view.focus();
+});
+
+document.querySelector("#tb-h4")?.addEventListener("click", () => {
+  Editor.setSection(view, 4);
+  view.focus();
+});
+
+document.querySelector("#tb-blockquote")?.addEventListener("click", () => {
+  Editor.setBlockquote(view);
+  view.focus();
+});
+
+document.querySelector("#tb-code-block")?.addEventListener("click", () => {
+  Editor.setCodeBlock(view);
+  view.focus();
+});
+
+document.querySelector("#tb-hr")?.addEventListener("click", () => {
+  Editor.insertHorizontalRule(view);
+  view.focus();
+});
+
+// Toolbar - history
+document.querySelector("#tb-undo")?.addEventListener("click", () => {
+  Editor.doUndo(view);
+  view.focus();
+});
+
+document.querySelector("#tb-redo")?.addEventListener("click", () => {
+  Editor.doRedo(view);
   view.focus();
 });
 
@@ -526,8 +663,48 @@ function updateFormatIndicator() {
   }
 }
 
-Editor.onSelectionChange(view, updateFormatIndicator);
+// Toolbar state tracking
+const tbBold = document.querySelector<HTMLButtonElement>("#tb-bold");
+const tbItalic = document.querySelector<HTMLButtonElement>("#tb-italic");
+const tbCode = document.querySelector<HTMLButtonElement>("#tb-code");
+const tbStrikethrough =
+  document.querySelector<HTMLButtonElement>("#tb-strikethrough");
+const tbLink = document.querySelector<HTMLButtonElement>("#tb-link");
+const tbParagraph = document.querySelector<HTMLButtonElement>("#tb-paragraph");
+const tbH1 = document.querySelector<HTMLButtonElement>("#tb-h1");
+const tbH2 = document.querySelector<HTMLButtonElement>("#tb-h2");
+const tbH3 = document.querySelector<HTMLButtonElement>("#tb-h3");
+const tbH4 = document.querySelector<HTMLButtonElement>("#tb-h4");
+const tbBlockquote =
+  document.querySelector<HTMLButtonElement>("#tb-blockquote");
+const tbCodeBlock = document.querySelector<HTMLButtonElement>("#tb-code-block");
+
+function updateToolbarState() {
+  // Update inline mark buttons
+  const marks = Editor.getActiveMarks(view);
+  tbBold?.classList.toggle("active", marks.strong);
+  tbItalic?.classList.toggle("active", marks.em);
+  tbCode?.classList.toggle("active", marks.code);
+  tbStrikethrough?.classList.toggle("active", marks.strikethrough);
+  tbLink?.classList.toggle("active", marks.link);
+
+  // Update block type buttons
+  const blockType = Editor.getBlockTypeName(view);
+  tbParagraph?.classList.toggle("active", blockType === "Paragraph");
+  tbH1?.classList.toggle("active", blockType === "Section");
+  tbH2?.classList.toggle("active", blockType === "Subsection");
+  tbH3?.classList.toggle("active", blockType === "Subsubsection");
+  tbH4?.classList.toggle("active", blockType === "Subsubsubsection");
+  tbBlockquote?.classList.toggle("active", blockType === "Block Quote");
+  tbCodeBlock?.classList.toggle("active", blockType === "Code Block");
+}
+
+Editor.onSelectionChange(view, () => {
+  updateFormatIndicator();
+  updateToolbarState();
+});
 updateFormatIndicator();
+updateToolbarState();
 
 // Startup: try to restore previous notebook
 async function startup() {
