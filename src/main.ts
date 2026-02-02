@@ -1,7 +1,35 @@
 import "./style.css";
 import "prosemirror-view/style/prosemirror.css";
+import { registerSW } from "virtual:pwa-register";
 import * as Editor from "./editor/editor";
 import { LocalFileSystemProvider } from "./storage/filesystem";
+
+// Register service worker and handle updates
+const updateSW = registerSW({
+  onNeedRefresh() {
+    showUpdateBanner();
+  },
+});
+
+function showUpdateBanner() {
+  const banner = document.createElement("div");
+  banner.className = "update-banner";
+  banner.innerHTML = `
+    <span>A new version is available</span>
+    <button id="update-refresh">Refresh</button>
+    <button id="update-dismiss">Dismiss</button>
+  `;
+  document.body.appendChild(banner);
+
+  document.getElementById("update-refresh")?.addEventListener("click", () => {
+    updateSW(true);
+  });
+
+  document.getElementById("update-dismiss")?.addEventListener("click", () => {
+    banner.remove();
+  });
+}
+
 import {
   createNote,
   extractTitle,

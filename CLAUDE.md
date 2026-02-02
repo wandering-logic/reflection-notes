@@ -59,6 +59,23 @@ The `yyyy/mm/dd/n` directory structure is an implementation detail to avoid huge
 - No note index for MVP - notes are scanned on demand. Index can be added to `notebook.json` later for performance.
 - Note title is extracted from the ProseMirror document's first node (the `title` node), not stored redundantly.
 
+## Build Output Layout
+
+Standard Vite PWA layout with the app at root:
+
+```
+dist/
+├── index.html          # The app
+├── manifest.webmanifest
+├── sw.js
+├── icon-*.png, favicon.svg
+├── CNAME
+└── assets/
+    └── *.js, *.css
+```
+
+Verify with `npm run build && npm run preview` → http://localhost:4173/
+
 ## TypeScript
 
 Strict mode is enabled. The build runs `tsc` for type-checking before Vite bundles the output. CI validates both type-checking and build on every push/PR.
