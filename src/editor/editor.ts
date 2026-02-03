@@ -394,6 +394,17 @@ export function getBlockTypeName(view: EditorView): string {
   return "";
 }
 
+export function isInsideBlockquote(view: EditorView): boolean {
+  const { $from } = view.state.selection;
+
+  for (let depth = $from.depth; depth >= 0; depth--) {
+    if ($from.node(depth).type.name === "blockquote") {
+      return true;
+    }
+  }
+  return false;
+}
+
 export interface ActiveMarks {
   strong: boolean;
   em: boolean;

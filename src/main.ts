@@ -98,6 +98,7 @@ app.innerHTML = `
               <div class="menu-item" id="format-strong">Strong</div>
               <div class="menu-item" id="format-em">Emphasis</div>
               <div class="menu-item" id="format-code">Code</div>
+              <div class="menu-item" id="format-strikethrough">Strikethrough</div>
               <div class="menu-item" id="format-link">Link...</div>
             </div>
           </div>
@@ -124,13 +125,22 @@ app.innerHTML = `
 
     <div class="toolbar" id="toolbar">
       <div class="toolbar-group">
-        <button class="toolbar-btn" id="tb-bold" title="Bold">
+        <button class="toolbar-btn" id="tb-undo" title="Undo">
+          <svg viewBox="0 0 24 24"><path d="M9 14l-4 -4l4 -4"/><path d="M5 10h11a4 4 0 1 1 0 8h-1"/></svg>
+        </button>
+        <button class="toolbar-btn" id="tb-redo" title="Redo">
+          <svg viewBox="0 0 24 24"><path d="M15 14l4 -4l-4 -4"/><path d="M19 10h-11a4 4 0 1 0 0 8h1"/></svg>
+        </button>
+      </div>
+      <div class="toolbar-separator"></div>
+      <div class="toolbar-group">
+        <button class="toolbar-btn" id="tb-bold" title="Strong">
           <svg viewBox="0 0 24 24"><path d="M7 5h6a3.5 3.5 0 0 1 0 7h-6z"/><path d="M13 12h1a3.5 3.5 0 0 1 0 7h-7v-7"/></svg>
         </button>
-        <button class="toolbar-btn" id="tb-italic" title="Italic">
+        <button class="toolbar-btn" id="tb-italic" title="Emphasis">
           <svg viewBox="0 0 24 24"><path d="M11 5l6 0"/><path d="M7 19l6 0"/><path d="M14 5l-4 14"/></svg>
         </button>
-        <button class="toolbar-btn" id="tb-code" title="Code">
+        <button class="toolbar-btn" id="tb-code" title="Inline Code">
           <svg viewBox="0 0 24 24"><path d="M7 8l-4 4l4 4"/><path d="M17 8l4 4l-4 4"/><path d="M14 4l-4 16"/></svg>
         </button>
         <button class="toolbar-btn" id="tb-strikethrough" title="Strikethrough">
@@ -157,9 +167,6 @@ app.innerHTML = `
         <button class="toolbar-btn" id="tb-h4" title="Subsubsubsection">
           <svg viewBox="0 0 24 24"><path d="M20 18v-8l-4 6h5"/><path d="M4 6v12"/><path d="M12 6v12"/><path d="M11 18h2"/><path d="M3 18h2"/><path d="M4 12h8"/><path d="M3 6h2"/><path d="M11 6h2"/></svg>
         </button>
-        <button class="toolbar-btn" id="tb-blockquote" title="Block Quote">
-          <svg viewBox="0 0 24 24"><path d="M6 15h15"/><path d="M21 19h-15"/><path d="M15 11h6"/><path d="M21 7h-6"/><path d="M9 9h1a1 1 0 1 1 -1 1v-2.5a2 2 0 0 1 2 -2"/><path d="M3 9h1a1 1 0 1 1 -1 1v-2.5a2 2 0 0 1 2 -2"/></svg>
-        </button>
         <button class="toolbar-btn" id="tb-code-block" title="Code Block">
           <svg viewBox="0 0 24 24"><path d="M14.5 4h2.5a3 3 0 0 1 3 3v10a3 3 0 0 1 -3 3h-10a3 3 0 0 1 -3 -3v-5"/><path d="M6 5l-2 2l2 2"/><path d="M10 9l2 -2l-2 -2"/></svg>
         </button>
@@ -169,11 +176,8 @@ app.innerHTML = `
       </div>
       <div class="toolbar-separator"></div>
       <div class="toolbar-group">
-        <button class="toolbar-btn" id="tb-undo" title="Undo">
-          <svg viewBox="0 0 24 24"><path d="M9 14l-4 -4l4 -4"/><path d="M5 10h11a4 4 0 1 1 0 8h-1"/></svg>
-        </button>
-        <button class="toolbar-btn" id="tb-redo" title="Redo">
-          <svg viewBox="0 0 24 24"><path d="M15 14l4 -4l-4 -4"/><path d="M19 10h-11a4 4 0 1 0 0 8h1"/></svg>
+        <button class="toolbar-btn" id="tb-blockquote" title="Block Quote">
+          <svg viewBox="0 0 24 24"><path d="M6 15h15"/><path d="M21 19h-15"/><path d="M15 11h6"/><path d="M21 7h-6"/><path d="M9 9h1a1 1 0 1 1 -1 1v-2.5a2 2 0 0 1 2 -2"/><path d="M3 9h1a1 1 0 1 1 -1 1v-2.5a2 2 0 0 1 2 -2"/></svg>
         </button>
       </div>
     </div>
@@ -296,6 +300,13 @@ document.querySelector("#format-code")?.addEventListener("click", () => {
   Editor.toggleCode(view);
   view.focus();
 });
+
+document
+  .querySelector("#format-strikethrough")
+  ?.addEventListener("click", () => {
+    Editor.toggleStrikethrough(view);
+    view.focus();
+  });
 
 document.querySelector("#format-link")?.addEventListener("click", () => {
   const href = prompt("Enter URL:");
@@ -695,8 +706,10 @@ function updateToolbarState() {
   tbH2?.classList.toggle("active", blockType === "Subsection");
   tbH3?.classList.toggle("active", blockType === "Subsubsection");
   tbH4?.classList.toggle("active", blockType === "Subsubsubsection");
-  tbBlockquote?.classList.toggle("active", blockType === "Block Quote");
   tbCodeBlock?.classList.toggle("active", blockType === "Code Block");
+
+  // Blockquote is a container - show active when cursor is inside one
+  tbBlockquote?.classList.toggle("active", Editor.isInsideBlockquote(view));
 }
 
 Editor.onSelectionChange(view, () => {
