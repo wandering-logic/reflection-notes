@@ -6,7 +6,13 @@ import {
 } from "prosemirror-commands";
 import { history, redo, undo } from "prosemirror-history";
 import { keymap } from "prosemirror-keymap";
-import { Fragment, Node, Slice } from "prosemirror-model";
+import { Fragment, Node, type NodeType, Slice } from "prosemirror-model";
+import {
+  liftListItem,
+  sinkListItem,
+  splitListItem,
+  wrapInList,
+} from "prosemirror-schema-list";
 import {
   EditorState,
   Plugin,
@@ -23,7 +29,7 @@ const markKeymap = keymap({
   "Mod-Shift-`": toggleMark(schema.marks.strikethrough),
 });
 
-// Tab navigation between title, subtitle, and first block
+// Tab navigation from title to first block (skipping created timestamp)
 function tabNavigation(
   state: EditorState,
   dispatch?: (tr: Transaction) => void,
@@ -31,20 +37,17 @@ function tabNavigation(
   const { $from } = state.selection;
   const grandparent = $from.node($from.depth - 1);
 
-  // Check if we're in title or subtitle (direct children of doc)
+  // Check if we're in title (direct child of doc at index 0)
   if (grandparent === state.doc) {
     const pos = $from.before($from.depth);
     const nodeIndex = state.doc.resolve(pos).index();
 
-    // If in title (index 0), move to subtitle (index 1)
-    // If in subtitle (index 1), move to first block (index 2)
-    if (nodeIndex < state.doc.childCount - 1) {
+    // If in title (index 0), move to first block (index 2, skipping created at index 1)
+    if (nodeIndex === 0 && state.doc.childCount > 2) {
       if (dispatch) {
-        let targetPos = 0;
-        for (let i = 0; i <= nodeIndex; i++) {
-          targetPos += state.doc.child(i).nodeSize;
-        }
-        // Position inside the next node
+        // Calculate position of first block (after title and created)
+        const targetPos =
+          state.doc.child(0).nodeSize + state.doc.child(1).nodeSize;
         const tr = state.tr.setSelection(
           Selection.near(state.doc.resolve(targetPos + 1)),
         );
@@ -56,6 +59,7 @@ function tabNavigation(
   return false;
 }
 
+// Shift-Tab navigation from first block back to title
 function shiftTabNavigation(
   state: EditorState,
   dispatch?: (tr: Transaction) => void,
@@ -63,22 +67,16 @@ function shiftTabNavigation(
   const { $from } = state.selection;
   const grandparent = $from.node($from.depth - 1);
 
-  // Check if we're in title, subtitle, or a block (direct children of doc)
+  // Check if we're in a block (direct child of doc, index >= 2)
   if (grandparent === state.doc) {
     const pos = $from.before($from.depth);
     const nodeIndex = state.doc.resolve(pos).index();
 
-    // If in subtitle or later, move to previous node
-    if (nodeIndex > 0) {
+    // If in first block (index 2) or later, move to title (index 0)
+    if (nodeIndex >= 2) {
       if (dispatch) {
-        let targetPos = 0;
-        for (let i = 0; i < nodeIndex - 1; i++) {
-          targetPos += state.doc.child(i).nodeSize;
-        }
-        // Position inside the previous node
-        const tr = state.tr.setSelection(
-          Selection.near(state.doc.resolve(targetPos + 1)),
-        );
+        // Position inside title (after opening tag)
+        const tr = state.tr.setSelection(Selection.near(state.doc.resolve(1)));
         dispatch(tr);
       }
       return true;
@@ -92,7 +90,15 @@ const navigationKeymap = keymap({
   "Shift-Tab": shiftTabNavigation,
 });
 
-// Placeholder plugin for empty title/subtitle
+// List keymap - Enter splits list items, Tab/Shift-Tab indent/unindent
+// These commands return false if not in a list, allowing fallback to navigation
+const listKeymap = keymap({
+  Enter: splitListItem(schema.nodes.list_item),
+  Tab: sinkListItem(schema.nodes.list_item),
+  "Shift-Tab": liftListItem(schema.nodes.list_item),
+});
+
+// Placeholder plugin for empty title
 const placeholderPlugin = new Plugin({
   props: {
     decorations(state) {
@@ -110,18 +116,6 @@ const placeholderPlugin = new Plugin({
         );
       }
 
-      // Check subtitle (second child)
-      const subtitle = doc.child(1);
-      const subtitlePos = title.nodeSize;
-      if (subtitle.type.name === "subtitle" && subtitle.content.size === 0) {
-        decorations.push(
-          Decoration.node(subtitlePos, subtitlePos + subtitle.nodeSize, {
-            class: "placeholder",
-            "data-placeholder": "Subtitle",
-          }),
-        );
-      }
-
       return DecorationSet.create(doc, decorations);
     },
   },
@@ -130,6 +124,7 @@ const placeholderPlugin = new Plugin({
 const plugins = [
   history(),
   markKeymap,
+  listKeymap,
   navigationKeymap,
   placeholderPlugin,
   keymap(baseKeymap),
@@ -145,7 +140,6 @@ export function mountEditor(host: HTMLElement): EditorView {
   // Create initial document with current timestamp
   const doc = schema.nodes.doc.create(null, [
     schema.nodes.title.create(),
-    schema.nodes.subtitle.create(),
     schema.nodes.created.create({ timestamp: Date.now() }),
     schema.nodes.paragraph.create(),
   ]);
@@ -192,8 +186,8 @@ export function mountEditor(host: HTMLElement): EditorView {
       const { $from } = state.selection;
       const docIndex = $from.index(0);
 
-      // Pasting into title or subtitle - extract inline content only
-      if (docIndex < 2) {
+      // Pasting into title - extract inline content only
+      if (docIndex === 0) {
         // Collect all inline content from pasted blocks
         const inlineNodes: Node[] = [];
         slice.content.forEach((node) => {
@@ -218,14 +212,14 @@ export function mountEditor(host: HTMLElement): EditorView {
       }
 
       // In created node - don't allow paste
-      if (docIndex === 2) {
+      if (docIndex === 1) {
         return true; // Consume the event but do nothing
       }
 
-      // Pasting into body - transform title/subtitle nodes to section level 1
+      // Pasting into body - transform title nodes to section level 1
       const transformedNodes: Node[] = [];
       slice.content.forEach((node) => {
-        if (node.type.name === "title" || node.type.name === "subtitle") {
+        if (node.type.name === "title") {
           // Convert to section level 1, preserving inline content
           transformedNodes.push(
             schema.nodes.section.create({ level: 1 }, node.content),
@@ -272,7 +266,6 @@ export function setContent(view: EditorView, content: unknown): void {
     // Create new document with current timestamp
     doc = schema.nodes.doc.create(null, [
       schema.nodes.title.create(),
-      schema.nodes.subtitle.create(),
       schema.nodes.created.create({ timestamp: Date.now() }),
       schema.nodes.paragraph.create(),
     ]);
@@ -319,6 +312,36 @@ export function setCodeBlock(view: EditorView): boolean {
 
 export function setBlockquote(view: EditorView): boolean {
   return wrapIn(schema.nodes.blockquote)(view.state, view.dispatch);
+}
+
+function isInList(state: EditorState, listType: NodeType): boolean {
+  const { $from } = state.selection;
+  for (let d = $from.depth; d > 0; d--) {
+    if ($from.node(d).type === listType) return true;
+  }
+  return false;
+}
+
+export function toggleBulletList(view: EditorView): boolean {
+  const { state, dispatch } = view;
+  const { bullet_list, list_item } = schema.nodes;
+
+  // If already in a bullet list, lift out
+  if (isInList(state, bullet_list)) {
+    return liftListItem(list_item)(state, dispatch);
+  }
+  return wrapInList(bullet_list)(state, dispatch);
+}
+
+export function toggleOrderedList(view: EditorView): boolean {
+  const { state, dispatch } = view;
+  const { ordered_list, list_item } = schema.nodes;
+
+  // If already in an ordered list, lift out
+  if (isInList(state, ordered_list)) {
+    return liftListItem(list_item)(state, dispatch);
+  }
+  return wrapInList(ordered_list)(state, dispatch);
 }
 
 export function insertHorizontalRule(view: EditorView): boolean {
@@ -368,8 +391,6 @@ export function getBlockTypeName(view: EditorView): string {
     switch (typeName) {
       case "title":
         return "Title";
-      case "subtitle":
-        return "Subtitle";
       case "paragraph":
         return "Paragraph";
       case "section": {
@@ -388,6 +409,12 @@ export function getBlockTypeName(view: EditorView): string {
         return "Horizontal Rule";
       case "created":
         return "Created";
+      case "bullet_list":
+        return "Bullet List";
+      case "ordered_list":
+        return "Ordered List";
+      case "list_item":
+        return "List Item";
     }
   }
 
@@ -399,6 +426,28 @@ export function isInsideBlockquote(view: EditorView): boolean {
 
   for (let depth = $from.depth; depth >= 0; depth--) {
     if ($from.node(depth).type.name === "blockquote") {
+      return true;
+    }
+  }
+  return false;
+}
+
+export function isInsideBulletList(view: EditorView): boolean {
+  const { $from } = view.state.selection;
+
+  for (let depth = $from.depth; depth >= 0; depth--) {
+    if ($from.node(depth).type.name === "bullet_list") {
+      return true;
+    }
+  }
+  return false;
+}
+
+export function isInsideOrderedList(view: EditorView): boolean {
+  const { $from } = view.state.selection;
+
+  for (let depth = $from.depth; depth >= 0; depth--) {
+    if ($from.node(depth).type.name === "ordered_list") {
       return true;
     }
   }

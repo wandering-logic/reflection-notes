@@ -1,5 +1,10 @@
 import { Schema } from "prosemirror-model";
 import { marks, nodes } from "prosemirror-schema-basic";
+import {
+  bulletList,
+  listItem,
+  orderedList,
+} from "prosemirror-schema-list";
 
 function formatTimestamp(ts: number): string {
   const date = new Date(ts);
@@ -17,22 +22,13 @@ function formatTimestamp(ts: number): string {
 export const schema = new Schema({
   nodes: {
     doc: {
-      content: "title subtitle created block+",
+      content: "title created block+",
     },
     title: {
       content: "inline*",
-      marks: "",
       parseDOM: [{ tag: "h1" }],
       toDOM() {
         return ["h1", 0];
-      },
-    },
-    subtitle: {
-      content: "inline*",
-      marks: "em",
-      parseDOM: [{ tag: "h2" }],
-      toDOM() {
-        return ["h2", 0];
       },
     },
     created: {
@@ -67,19 +63,19 @@ export const schema = new Schema({
       ...nodes.paragraph,
       group: "block",
     },
-    // Section headings: level 1=Section (h3), 2=Subsection (h4), 3=Subsubsection (h5)
+    // Section headings: level 1=Section (h2), 2=Subsection (h3), 3=Subsubsection (h4)
     section: {
       attrs: { level: { default: 1, validate: "number" } },
       content: "inline*",
       group: "block",
       parseDOM: [
-        { tag: "h3", attrs: { level: 1 } },
-        { tag: "h4", attrs: { level: 2 } },
-        { tag: "h5", attrs: { level: 3 } },
-        { tag: "h6", attrs: { level: 4 } },
+        { tag: "h2", attrs: { level: 1 } },
+        { tag: "h3", attrs: { level: 2 } },
+        { tag: "h4", attrs: { level: 3 } },
+        { tag: "h5", attrs: { level: 4 } },
       ],
       toDOM(node) {
-        return [`h${node.attrs.level + 2}`, 0];
+        return [`h${node.attrs.level + 1}`, 0];
       },
     },
     code_block: {
@@ -94,9 +90,22 @@ export const schema = new Schema({
       ...nodes.horizontal_rule,
       group: "block",
     },
+    bullet_list: {
+      ...bulletList,
+      content: "list_item+",
+      group: "block",
+    },
+    ordered_list: {
+      ...orderedList,
+      content: "list_item+",
+      group: "block",
+    },
+    list_item: {
+      ...listItem,
+      content: "block+",
+    },
     text: nodes.text,
     // image: add later
-    // bullet_list, ordered_list, list_item: add later
   },
   marks: {
     strong: marks.strong,

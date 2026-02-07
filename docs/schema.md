@@ -39,9 +39,10 @@ HorizontalRule <- ε                          ; atomic
 
 Blockquote     <- Block+                     ; recursive
 
-List           <- ListItem+
+List           <- ListItem+                  ; lists can be "ordered" or "unordered"
 
-ListItem       <- ???                        ; markdown and html have notions of tight and loose lists
+ListItem       <- Block+                     ; markdown and html have notions of tight and loose we
+                                             ; basically just have "loose" (listitems contain blocks)
 
 Inline         <- Text
 Text           <- (char, Mark*)*

@@ -25,7 +25,7 @@ This is a rich text editor application built on ProseMirror. The editor uses Pro
 **Key files:**
 - `src/main.ts` - Application entry point, UI shell, file menu handlers
 - `src/editor/editor.ts` - ProseMirror editor initialization and commands
-- `src/editor/schema.ts` - Document schema (title, subtitle, created, sections, etc.)
+- `src/editor/schema.ts` - Document schema (title, created, sections, etc.)
 - `src/storage/filesystem.ts` - FileSystemProvider interface + local implementation
 - `src/storage/notebook.ts` - Notebook operations
 - `src/storage/note.ts` - Note operations
@@ -36,6 +36,11 @@ This is a rich text editor application built on ProseMirror. The editor uses Pro
 - `prosemirror-model` with `prosemirror-schema-basic` for document structure
 - `prosemirror-history` for undo/redo
 - `prosemirror-keymap` + `prosemirror-commands` for keyboard shortcuts
+
+**Toolbar icons:**
+- Inlined SVGs from Tabler Icons (tabler.io/icons, MIT license)
+- Icon names documented in HTML comment at line 126 of `src/main.ts`
+- One exception: `tb-h1` uses a custom seriffed "H" (Tabler's `h-1` includes the digit)
 
 ## Storage Architecture
 

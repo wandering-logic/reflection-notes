@@ -25,7 +25,6 @@ export interface NoteInfo {
 export function createBlankDocument(timestamp: number): unknown {
   const doc = schema.nodes.doc.create(null, [
     schema.nodes.title.create(),
-    schema.nodes.subtitle.create(),
     schema.nodes.created.create({ timestamp }),
     schema.nodes.paragraph.create(),
   ]);

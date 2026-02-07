@@ -110,10 +110,12 @@ app.innerHTML = `
               <div class="menu-item" id="format-subsection">Subsection</div>
               <div class="menu-item" id="format-subsubsection">Subsubsection</div>
               <div class="menu-item" id="format-subsubsubsection">Subsubsubsection</div>
-              <div class="menu-separator"></div>
-              <div class="menu-item" id="format-blockquote">Block Quote</div>
               <div class="menu-item" id="format-code-block">Code Block</div>
               <div class="menu-item" id="format-hr">Horizontal Rule</div>
+              <div class="menu-separator"></div>
+              <div class="menu-item" id="format-blockquote">Block Quote</div>
+              <div class="menu-item" id="format-bullet-list">Bullet List</div>
+              <div class="menu-item" id="format-ordered-list">Ordered List</div>
             </div>
           </div>
         </div>
@@ -123,6 +125,25 @@ app.innerHTML = `
       <div class="menu">Help</div>
     </header>
 
+    <!-- Toolbar icons from Tabler Icons (tabler.io/icons, MIT license)
+         tb-undo: arrow-back-up
+         tb-redo: arrow-forward-up
+         tb-bold: bold
+         tb-italic: italic
+         tb-code: code
+         tb-strikethrough: strikethrough
+         tb-link: link
+         tb-paragraph: pilcrow
+         tb-h1: custom (seriffed H, not Tabler's h-1 which has the digit)
+         tb-h2: h-3
+         tb-h3: h-4
+         tb-h4: h-5
+         tb-code-block: source-code
+         tb-hr: separator-horizontal
+         tb-blockquote: blockquote
+         tb-bullet-list: list
+         tb-ordered-list: list-numbers
+    -->
     <div class="toolbar" id="toolbar">
       <div class="toolbar-group">
         <button class="toolbar-btn" id="tb-undo" title="Undo">
@@ -159,13 +180,13 @@ app.innerHTML = `
           <svg viewBox="0 0 24 24"><path d="M7 12h10"/><path d="M7 5v14"/><path d="M17 5v14"/><path d="M15 19h4"/><path d="M15 5h4"/><path d="M5 19h4"/><path d="M5 5h4"/></svg>
         </button>
         <button class="toolbar-btn" id="tb-h2" title="Subsection">
-          <svg viewBox="0 0 24 24"><path d="M17 12a2 2 0 1 1 4 0c0 .591 -.417 1.318 -.816 1.858l-3.184 4.143l4 0"/><path d="M4 6v12"/><path d="M12 6v12"/><path d="M11 18h2"/><path d="M3 18h2"/><path d="M4 12h8"/><path d="M3 6h2"/><path d="M11 6h2"/></svg>
-        </button>
-        <button class="toolbar-btn" id="tb-h3" title="Subsubsection">
           <svg viewBox="0 0 24 24"><path d="M19 14a2 2 0 1 0 -2 -2"/><path d="M17 16a2 2 0 1 0 2 -2"/><path d="M4 6v12"/><path d="M12 6v12"/><path d="M11 18h2"/><path d="M3 18h2"/><path d="M4 12h8"/><path d="M3 6h2"/><path d="M11 6h2"/></svg>
         </button>
-        <button class="toolbar-btn" id="tb-h4" title="Subsubsubsection">
+        <button class="toolbar-btn" id="tb-h3" title="Subsubsection">
           <svg viewBox="0 0 24 24"><path d="M20 18v-8l-4 6h5"/><path d="M4 6v12"/><path d="M12 6v12"/><path d="M11 18h2"/><path d="M3 18h2"/><path d="M4 12h8"/><path d="M3 6h2"/><path d="M11 6h2"/></svg>
+        </button>
+        <button class="toolbar-btn" id="tb-h4" title="Subsubsubsection">
+          <svg viewBox="0 0 24 24"><path d="M17 18h2a2 2 0 1 0 0 -4h-2v-4h4"/><path d="M4 6v12"/><path d="M12 6v12"/><path d="M11 18h2"/><path d="M3 18h2"/><path d="M4 12h8"/><path d="M3 6h2"/><path d="M11 6h2"/></svg>
         </button>
         <button class="toolbar-btn" id="tb-code-block" title="Code Block">
           <svg viewBox="0 0 24 24"><path d="M14.5 4h2.5a3 3 0 0 1 3 3v10a3 3 0 0 1 -3 3h-10a3 3 0 0 1 -3 -3v-5"/><path d="M6 5l-2 2l2 2"/><path d="M10 9l2 -2l-2 -2"/></svg>
@@ -178,6 +199,12 @@ app.innerHTML = `
       <div class="toolbar-group">
         <button class="toolbar-btn" id="tb-blockquote" title="Block Quote">
           <svg viewBox="0 0 24 24"><path d="M6 15h15"/><path d="M21 19h-15"/><path d="M15 11h6"/><path d="M21 7h-6"/><path d="M9 9h1a1 1 0 1 1 -1 1v-2.5a2 2 0 0 1 2 -2"/><path d="M3 9h1a1 1 0 1 1 -1 1v-2.5a2 2 0 0 1 2 -2"/></svg>
+        </button>
+        <button class="toolbar-btn" id="tb-bullet-list" title="Bullet List">
+          <svg viewBox="0 0 24 24"><path d="M9 6l11 0"/><path d="M9 12l11 0"/><path d="M9 18l11 0"/><path d="M5 6l0 .01"/><path d="M5 12l0 .01"/><path d="M5 18l0 .01"/></svg>
+        </button>
+        <button class="toolbar-btn" id="tb-ordered-list" title="Ordered List">
+          <svg viewBox="0 0 24 24"><path d="M11 6h9"/><path d="M11 12h9"/><path d="M12 18h8"/><path d="M4 16a2 2 0 1 1 4 0c0 .591 -.5 1 -1 1.5l-3 2.5h4"/><path d="M6 10v-6l-2 2"/></svg>
         </button>
       </div>
     </div>
@@ -280,6 +307,16 @@ document.querySelector("#format-blockquote")?.addEventListener("click", () => {
   view.focus();
 });
 
+document.querySelector("#format-bullet-list")?.addEventListener("click", () => {
+  Editor.toggleBulletList(view);
+  view.focus();
+});
+
+document.querySelector("#format-ordered-list")?.addEventListener("click", () => {
+  Editor.toggleOrderedList(view);
+  view.focus();
+});
+
 document.querySelector("#format-hr")?.addEventListener("click", () => {
   Editor.insertHorizontalRule(view);
   view.focus();
@@ -373,6 +410,16 @@ document.querySelector("#tb-h4")?.addEventListener("click", () => {
 
 document.querySelector("#tb-blockquote")?.addEventListener("click", () => {
   Editor.setBlockquote(view);
+  view.focus();
+});
+
+document.querySelector("#tb-bullet-list")?.addEventListener("click", () => {
+  Editor.toggleBulletList(view);
+  view.focus();
+});
+
+document.querySelector("#tb-ordered-list")?.addEventListener("click", () => {
+  Editor.toggleOrderedList(view);
   view.focus();
 });
 
@@ -688,6 +735,10 @@ const tbH3 = document.querySelector<HTMLButtonElement>("#tb-h3");
 const tbH4 = document.querySelector<HTMLButtonElement>("#tb-h4");
 const tbBlockquote =
   document.querySelector<HTMLButtonElement>("#tb-blockquote");
+const tbBulletList =
+  document.querySelector<HTMLButtonElement>("#tb-bullet-list");
+const tbOrderedList =
+  document.querySelector<HTMLButtonElement>("#tb-ordered-list");
 const tbCodeBlock = document.querySelector<HTMLButtonElement>("#tb-code-block");
 
 function updateToolbarState() {
@@ -708,8 +759,10 @@ function updateToolbarState() {
   tbH4?.classList.toggle("active", blockType === "Subsubsubsection");
   tbCodeBlock?.classList.toggle("active", blockType === "Code Block");
 
-  // Blockquote is a container - show active when cursor is inside one
+  // Container blocks - show active when cursor is inside one
   tbBlockquote?.classList.toggle("active", Editor.isInsideBlockquote(view));
+  tbBulletList?.classList.toggle("active", Editor.isInsideBulletList(view));
+  tbOrderedList?.classList.toggle("active", Editor.isInsideOrderedList(view));
 }
 
 Editor.onSelectionChange(view, () => {
