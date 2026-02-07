@@ -29,7 +29,7 @@ Label          <- Text
 
 Block          <- LeafBlock | ContainerBlock
 
-LeafBlock      <- Paragraph | Section | CodeBlock | HorizontalRule
+LeafBlock      <- Paragraph | Section | CodeBlock | MathDisplay | HorizontalRule
 ContainerBlock <- Blockquote | List
 
 Paragraph      <- Inline*
@@ -44,9 +44,13 @@ List           <- ListItem+                  ; lists can be "ordered" or "unorde
 ListItem       <- Block+                     ; markdown and html have notions of tight and loose we
                                              ; basically just have "loose" (listitems contain blocks)
 
-Inline         <- Text
+Inline         <- Text | MathInline
 Text           <- (char, Mark*)*
 
 Mark           <- Strong | Em | Code | Link | Strikethrough ; this is not tree structured, but is what ProseMirror advocates
+
+MathInline     <- LaTeXSource          ; inline atom node
+MathDisplay    <- LaTeXSource          ; block atom node
+LaTeXSource    <- text*                ; marks forbidden
 ```
 
