@@ -2,9 +2,14 @@ import "./style.css";
 import "prosemirror-view/style/prosemirror.css";
 import { registerSW } from "virtual:pwa-register";
 import * as Editor from "./editor/editor";
-import { addImageBlobUrl, setImageBlobUrls } from "./editor/imageNodeView";
+import { addImageBlobUrl, setAssetLoadContext } from "./editor/imageNodeView";
 import { LocalFileSystemProvider } from "./storage/filesystem";
-import { saveImage } from "./storage/image";
+import {
+  isAllowedImageType,
+  parseDataUrl,
+  saveImage,
+  saveImageFromBlob,
+} from "./storage/image";
 
 // Register service worker and handle updates
 const updateSW = registerSW({
@@ -258,6 +263,9 @@ if (!editor) throw new Error("#editor not found");
 
 const view = Editor.mountEditor(editor);
 
+// Set up copy handler for proper image clipboard handling
+Editor.setupCopyHandler(view);
+
 // Click in empty space below content should focus and move cursor to end
 editor.addEventListener("click", (e) => {
   if (e.target === editor) {
@@ -471,6 +479,7 @@ async function handleNewNote() {
   await saveNotebookMeta(fs, currentNotebook);
 
   // Load into editor
+  setupAssetLoadContext();
   Editor.setContent(view, note.content);
   setupImagePasteContext();
   updateTitle();
@@ -528,9 +537,9 @@ async function handleOpenNote() {
   await saveNotebookMeta(fs, currentNotebook);
 
   // Load into editor
+  setupAssetLoadContext();
   Editor.setContent(view, note.content);
   setupImagePasteContext();
-  await loadImageBlobUrls();
   updateTitle();
   view.focus();
 }
@@ -544,6 +553,7 @@ async function handleNewNotebook() {
     currentNotebook = notebook;
     currentNote = note;
 
+    setupAssetLoadContext();
     Editor.setContent(view, note.content);
     setupImagePasteContext();
     updateTitle();
@@ -569,15 +579,16 @@ async function handleOpenNotebook() {
       try {
         const note = await loadNote(fs, notebook, notebook.meta.lastOpenedNote);
         currentNote = note;
+        setupAssetLoadContext();
         Editor.setContent(view, note.content);
         setupImagePasteContext();
-        await loadImageBlobUrls();
       } catch {
         // Last note doesn't exist, create a new one
         const note = await createNote(fs, notebook);
         currentNote = note;
         notebook.meta.lastOpenedNote = note.path;
         await saveNotebookMeta(fs, notebook);
+        setupAssetLoadContext();
         Editor.setContent(view, note.content);
         setupImagePasteContext();
       }
@@ -587,6 +598,7 @@ async function handleOpenNotebook() {
       currentNote = note;
       notebook.meta.lastOpenedNote = note.path;
       await saveNotebookMeta(fs, notebook);
+      setupAssetLoadContext();
       Editor.setContent(view, note.content);
       setupImagePasteContext();
     }
@@ -623,47 +635,95 @@ function setupImagePasteContext() {
       const result = await saveImage(fs, notebook, notePath, file);
       // Create blob URL for immediate display
       const blobUrl = URL.createObjectURL(file);
-      addImageBlobUrl(view, result.relativePath, blobUrl);
+      addImageBlobUrl(view, result.relativePath, blobUrl, file);
+      return result;
+    },
+
+    saveImageFromUrl: async (url: string) => {
+      // Fetch the image from the URL
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch image: ${response.status}`);
+      }
+
+      const blob = await response.blob();
+
+      // Check if the MIME type is allowed
+      if (!isAllowedImageType(blob.type)) {
+        throw new Error(`Unsupported image type: ${blob.type}`);
+      }
+
+      // Extract a suggested name from the URL
+      const urlPath = new URL(url).pathname;
+      const suggestedName = urlPath.split("/").pop() || "image";
+
+      const result = await saveImageFromBlob(
+        fs,
+        notebook,
+        notePath,
+        blob,
+        suggestedName,
+      );
+
+      // Create blob URL for immediate display
+      const blobUrl = URL.createObjectURL(blob);
+      addImageBlobUrl(view, result.relativePath, blobUrl, blob);
+
+      return result;
+    },
+
+    saveImageFromDataUrl: async (dataUrl: string) => {
+      // Parse the data URL
+      const parsed = parseDataUrl(dataUrl);
+      if (!parsed) {
+        throw new Error("Invalid data URL");
+      }
+
+      // Check if the MIME type is allowed
+      if (!isAllowedImageType(parsed.mimeType)) {
+        throw new Error(`Unsupported image type: ${parsed.mimeType}`);
+      }
+
+      // Create a blob from the parsed data
+      const blob = new Blob([parsed.data], { type: parsed.mimeType });
+
+      const result = await saveImageFromBlob(
+        fs,
+        notebook,
+        notePath,
+        blob,
+        "image",
+      );
+
+      // Create blob URL for immediate display
+      const blobUrl = URL.createObjectURL(blob);
+      addImageBlobUrl(view, result.relativePath, blobUrl, blob);
+
       return result;
     },
   });
 }
 
 /**
- * Load blob URLs for all images referenced in the current document.
- * Must be called after loading a note.
+ * Set up asset load context for the current note.
+ * Allows NodeViews to load assets (images) on demand.
+ * Must be called after loading/creating a note.
  */
-async function loadImageBlobUrls() {
+function setupAssetLoadContext() {
   if (!currentNotebook || !currentNote) return;
 
-  const urls = new Map<string, string>();
+  const notebook = currentNotebook;
+  const notePath = currentNote.path;
 
-  // Walk document to find all image nodes
-  const doc = view.state.doc;
-  doc.descendants((node) => {
-    if (node.type.name === "image") {
-      const src = node.attrs.src as string;
-      if (src && !urls.has(src)) {
-        urls.set(src, ""); // Placeholder, will be filled below
-      }
-    }
-  });
-
-  // Load each image
-  for (const relativePath of urls.keys()) {
-    try {
+  setAssetLoadContext(view, {
+    loadAsset: async (relativePath: string) => {
       const data = await fs.readBinaryFile(
-        currentNotebook.handle,
-        `${currentNote.path}/${relativePath}`,
+        notebook.handle,
+        `${notePath}/${relativePath}`,
       );
-      const blob = new Blob([data]);
-      urls.set(relativePath, URL.createObjectURL(blob));
-    } catch (e) {
-      console.warn(`Failed to load image: ${relativePath}`, e);
-    }
-  }
-
-  setImageBlobUrls(view, urls);
+      return new Blob([data]);
+    },
+  });
 }
 
 document
@@ -733,15 +793,16 @@ async function handleReconnect() {
       try {
         const note = await loadNote(fs, notebook, notebook.meta.lastOpenedNote);
         currentNote = note;
+        setupAssetLoadContext();
         Editor.setContent(view, note.content);
         setupImagePasteContext();
-        await loadImageBlobUrls();
       } catch {
         // Last note doesn't exist, create a new one
         const note = await createNote(fs, notebook);
         currentNote = note;
         notebook.meta.lastOpenedNote = note.path;
         await saveNotebookMeta(fs, notebook);
+        setupAssetLoadContext();
         Editor.setContent(view, note.content);
         setupImagePasteContext();
       }
@@ -751,6 +812,7 @@ async function handleReconnect() {
       currentNote = note;
       notebook.meta.lastOpenedNote = note.path;
       await saveNotebookMeta(fs, notebook);
+      setupAssetLoadContext();
       Editor.setContent(view, note.content);
       setupImagePasteContext();
     }
@@ -879,9 +941,9 @@ async function startup() {
       try {
         const note = await loadNote(fs, notebook, notebook.meta.lastOpenedNote);
         currentNote = note;
+        setupAssetLoadContext();
         Editor.setContent(view, note.content);
         setupImagePasteContext();
-        await loadImageBlobUrls();
         updateTitle();
         view.focus();
         return;
@@ -891,6 +953,7 @@ async function startup() {
         currentNote = note;
         notebook.meta.lastOpenedNote = note.path;
         await saveNotebookMeta(fs, notebook);
+        setupAssetLoadContext();
         Editor.setContent(view, note.content);
         setupImagePasteContext();
         updateTitle();
@@ -903,6 +966,7 @@ async function startup() {
       currentNote = note;
       notebook.meta.lastOpenedNote = note.path;
       await saveNotebookMeta(fs, notebook);
+      setupAssetLoadContext();
       Editor.setContent(view, note.content);
       setupImagePasteContext();
       updateTitle();

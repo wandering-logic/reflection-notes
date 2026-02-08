@@ -359,3 +359,15 @@ body {
   outline: 2px solid #007bff;
   outline-offset: 2px;
 }
+.ProseMirror img.pm-image-loading {
+  min-height: 100px;
+  min-width: 100px;
+  background: #f5f5f5;
+  border: 1px dashed #ccc;
+}
+.ProseMirror img.pm-image-error {
+  min-height: 50px;
+  min-width: 100px;
+  background: #fef0f0;
+  border: 1px dashed #c44;
+}

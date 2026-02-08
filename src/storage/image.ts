@@ -72,3 +72,54 @@ export async function saveImage(
 
   return { relativePath: filename };
 }
+
+export interface ParsedDataUrl {
+  mimeType: string;
+  data: ArrayBuffer;
+}
+
+/**
+ * Parse a data URL into its MIME type and binary data.
+ * Returns null if the URL is not a valid data URL.
+ */
+export function parseDataUrl(dataUrl: string): ParsedDataUrl | null {
+  const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+  if (!match) return null;
+
+  const mimeType = match[1];
+  const base64 = match[2];
+
+  try {
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return { mimeType, data: bytes.buffer };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Save image from a Blob to note directory.
+ * Used for images fetched from URLs or decoded from data URLs.
+ */
+export async function saveImageFromBlob(
+  fs: FileSystemProvider,
+  notebook: Notebook,
+  notePath: string,
+  blob: Blob,
+  suggestedName: string,
+): Promise<ImageSaveResult> {
+  if (!isAllowedImageType(blob.type)) {
+    throw new Error(`Unsupported image type: ${blob.type}`);
+  }
+
+  const filename = generateImageFilename(suggestedName, blob.type);
+  const data = await blob.arrayBuffer();
+
+  await fs.writeBinaryFile(notebook.handle, `${notePath}/${filename}`, data);
+
+  return { relativePath: filename };
+}

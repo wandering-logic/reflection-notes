@@ -22,8 +22,92 @@ import {
 } from "prosemirror-state";
 import { Decoration, DecorationSet, EditorView } from "prosemirror-view";
 import { isAllowedImageType } from "../storage/image";
-import { addImageBlobUrl, createImageNodeView } from "./imageNodeView";
+import {
+  addImageBlobUrl,
+  createImageNodeView,
+  getImageBlob,
+  getImageDataUrl,
+} from "./imageNodeView";
 import { schema } from "./schema";
+
+/** Categorize image src types */
+type ImageSrcType = "remote" | "data" | "relative" | "blob";
+
+function categorizeImageSrc(src: string): ImageSrcType {
+  if (src.startsWith("data:")) return "data";
+  if (src.startsWith("http://") || src.startsWith("https://")) return "remote";
+  if (src.startsWith("blob:")) return "blob";
+  return "relative";
+}
+
+interface ImageToProcess {
+  node: Node;
+  src: string;
+  srcType: ImageSrcType;
+}
+
+/** Find all images in a slice that need processing (remote or data URLs) */
+function findImagesToProcess(slice: Slice): ImageToProcess[] {
+  const images: ImageToProcess[] = [];
+
+  function walkFragment(fragment: Fragment) {
+    fragment.forEach((node) => {
+      if (node.type.name === "image") {
+        const src = node.attrs.src as string;
+        const srcType = categorizeImageSrc(src);
+        if (srcType === "remote" || srcType === "data") {
+          images.push({ node, src, srcType });
+        }
+      }
+      if (node.content.size > 0) {
+        walkFragment(node.content);
+      }
+    });
+  }
+
+  walkFragment(slice.content);
+  return images;
+}
+
+/** Transform a slice by replacing image src attributes */
+function transformSliceImages(
+  slice: Slice,
+  srcMap: Map<string, string>,
+): Slice {
+  function transformFragment(fragment: Fragment): Fragment {
+    const nodes: Node[] = [];
+    fragment.forEach((node) => {
+      if (node.type.name === "image") {
+        const oldSrc = node.attrs.src as string;
+        const newSrc = srcMap.get(oldSrc);
+        if (newSrc !== undefined) {
+          nodes.push(
+            node.type.create({ ...node.attrs, src: newSrc }, node.content),
+          );
+        } else {
+          nodes.push(node);
+        }
+      } else if (node.content.size > 0) {
+        nodes.push(
+          node.type.create(
+            node.attrs,
+            transformFragment(node.content),
+            node.marks,
+          ),
+        );
+      } else {
+        nodes.push(node);
+      }
+    });
+    return Fragment.from(nodes);
+  }
+
+  return new Slice(
+    transformFragment(slice.content),
+    slice.openStart,
+    slice.openEnd,
+  );
+}
 
 const markKeymap = keymap({
   "Mod-b": toggleMark(schema.marks.strong),
@@ -143,6 +227,10 @@ const selectionListeners = new WeakMap<EditorView, () => void>();
 export interface ImagePasteContext {
   /** Save image file and return its relative path */
   saveImage: (file: File) => Promise<{ relativePath: string }>;
+  /** Fetch image from URL, save it, and return its relative path */
+  saveImageFromUrl: (url: string) => Promise<{ relativePath: string }>;
+  /** Decode data URL, save the image, and return its relative path */
+  saveImageFromDataUrl: (dataUrl: string) => Promise<{ relativePath: string }>;
 }
 
 const imagePasteContexts = new WeakMap<EditorView, ImagePasteContext>();
@@ -231,7 +319,8 @@ export function mountEditor(host: HTMLElement): EditorView {
               const result = await context.saveImage(file);
               // Create blob URL for immediate display
               const blobUrl = URL.createObjectURL(file);
-              addImageBlobUrl(view, result.relativePath, blobUrl);
+              // Pass original file for copy cache
+              addImageBlobUrl(view, result.relativePath, blobUrl, file);
               return schema.nodes.image.create({
                 src: result.relativePath,
                 alt: file.name,
@@ -242,6 +331,155 @@ export function mountEditor(host: HTMLElement): EditorView {
             for (const node of imageNodes) {
               tr.replaceSelectionWith(node);
             }
+            view.dispatch(tr);
+          });
+
+          return true; // Consume the paste event
+        }
+      }
+
+      // Check for images in HTML content that need processing (remote URLs, data URLs)
+      const imagesToProcess = findImagesToProcess(slice);
+      if (imagesToProcess.length > 0) {
+        const context = imagePasteContexts.get(view);
+        if (!context) {
+          console.warn("No image paste context available");
+          return false;
+        }
+
+        const { state } = view;
+        const { $from } = state.selection;
+        const docIndex = $from.index(0);
+
+        // Don't allow images in title or created
+        if (docIndex < 2) {
+          // Filter out images from slice
+          const srcMap = new Map<string, string>();
+          for (const img of imagesToProcess) {
+            srcMap.set(img.src, ""); // Empty string will be filtered out
+          }
+          slice = transformSliceImages(slice, srcMap);
+          // Continue with normal paste handling below
+        } else {
+          // Separate data URLs (can process immediately) from remote URLs (need async fetch)
+          const dataUrlImages = imagesToProcess.filter(
+            (img) => img.srcType === "data",
+          );
+          const remoteUrlImages = imagesToProcess.filter(
+            (img) => img.srcType === "remote",
+          );
+
+          // Process all images and build src mapping
+          const srcMap = new Map<string, string>();
+
+          // Handle remote URLs: insert placeholder, then fetch async
+          for (const img of remoteUrlImages) {
+            const placeholderId = `placeholder:loading-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+            srcMap.set(img.src, placeholderId);
+
+            // Fetch and save in background, then update document
+            context
+              .saveImageFromUrl(img.src)
+              .then((result) => {
+                // Find and update the placeholder in the document
+                const { doc, tr } = view.state;
+                let updated = false;
+                doc.descendants((node, pos) => {
+                  if (
+                    node.type.name === "image" &&
+                    node.attrs.src === placeholderId
+                  ) {
+                    tr.setNodeMarkup(pos, null, {
+                      ...node.attrs,
+                      src: result.relativePath,
+                    });
+                    updated = true;
+                  }
+                  return !updated; // Stop if we found it
+                });
+                if (updated) {
+                  view.dispatch(tr);
+                }
+              })
+              .catch((err) => {
+                console.error("Failed to fetch image:", img.src, err);
+                // Update placeholder to error state
+                const { doc, tr } = view.state;
+                let updated = false;
+                doc.descendants((node, pos) => {
+                  if (
+                    node.type.name === "image" &&
+                    node.attrs.src === placeholderId
+                  ) {
+                    tr.setNodeMarkup(pos, null, {
+                      ...node.attrs,
+                      src: "placeholder:failed",
+                    });
+                    updated = true;
+                  }
+                  return !updated;
+                });
+                if (updated) {
+                  view.dispatch(tr);
+                }
+              });
+          }
+
+          // Handle data URLs: decode and save immediately
+          const dataUrlPromises = dataUrlImages.map(async (img) => {
+            try {
+              const result = await context.saveImageFromDataUrl(img.src);
+              srcMap.set(img.src, result.relativePath);
+            } catch (err) {
+              console.error("Failed to save data URL image:", err);
+              srcMap.set(img.src, "placeholder:failed");
+            }
+          });
+
+          // Wait for data URLs to be processed, then continue with paste
+          Promise.all(dataUrlPromises).then(() => {
+            const transformedSlice = transformSliceImages(slice, srcMap);
+
+            // Now do the normal paste handling with transformed slice
+            let hasBlockContent = false;
+            transformedSlice.content.forEach((node) => {
+              if (node.isBlock) hasBlockContent = true;
+            });
+
+            if (!hasBlockContent) {
+              // Just insert inline content
+              const tr = view.state.tr;
+              tr.replaceSelection(transformedSlice);
+              view.dispatch(tr);
+              return;
+            }
+
+            // Handle body paste
+            const transformedNodes: Node[] = [];
+            transformedSlice.content.forEach((node) => {
+              if (node.type.name === "title") {
+                transformedNodes.push(
+                  schema.nodes.section.create({ level: 1 }, node.content),
+                );
+              } else {
+                transformedNodes.push(node);
+              }
+            });
+
+            const tr = view.state.tr;
+            const $from = view.state.selection.$from;
+            const currentBlock = $from.node(1);
+            const beforeBlock = $from.before(1);
+            const afterBlock = $from.after(1);
+
+            if (currentBlock.content.size === 0) {
+              tr.replaceWith(beforeBlock, afterBlock, transformedNodes);
+            } else {
+              tr.insert(afterBlock, transformedNodes);
+            }
+
+            const insertEnd = tr.mapping.map(afterBlock);
+            tr.setSelection(Selection.near(tr.doc.resolve(insertEnd)));
             view.dispatch(tr);
           });
 
@@ -590,4 +828,96 @@ export function getActiveMarks(view: EditorView): ActiveMarks {
   }
 
   return result;
+}
+
+/**
+ * Set up copy interception for a view.
+ * Handles two cases:
+ * 1. Single image selected: writes image data to clipboard (for image editors like GIMP)
+ * 2. Rich text with images: replaces relative paths with data URLs for portability
+ */
+export function setupCopyHandler(view: EditorView): () => void {
+  const handler = async (event: ClipboardEvent) => {
+    if (!view.hasFocus()) return;
+
+    const { selection } = view.state;
+
+    // Case A: Single image selected (NodeSelection)
+    if (
+      selection instanceof NodeSelection &&
+      selection.node.type.name === "image"
+    ) {
+      const src = selection.node.attrs.src as string;
+
+      // Only handle relative paths (our locally stored images)
+      if (!isRelativePath(src)) return;
+
+      const blob = getImageBlob(view, src);
+      const dataUrl = getImageDataUrl(view, src);
+
+      if (blob && dataUrl) {
+        event.preventDefault();
+
+        try {
+          // Write to clipboard using async Clipboard API
+          const clipboardItem = new ClipboardItem({
+            [blob.type]: blob,
+            "text/html": new Blob([`<img src="${dataUrl}">`], {
+              type: "text/html",
+            }),
+          });
+          await navigator.clipboard.write([clipboardItem]);
+        } catch (err) {
+          console.error("Failed to write image to clipboard:", err);
+        }
+      }
+      return;
+    }
+
+    // Case B: Rich text with images - replace relative paths with data URLs
+    const html = event.clipboardData?.getData("text/html");
+    if (!html || !html.includes("<img")) return;
+
+    // Find all relative image paths and replace with data URLs
+    const processed = html.replace(
+      /<img([^>]*)\ssrc=["']([^"']+)["']([^>]*)>/gi,
+      (_match, before, src, after) => {
+        if (isRelativePath(src)) {
+          const dataUrl = getImageDataUrl(view, src);
+          if (dataUrl) {
+            return `<img${before} src="${dataUrl}"${after}>`;
+          }
+        }
+        return _match;
+      },
+    );
+
+    if (processed !== html) {
+      event.preventDefault();
+      event.clipboardData?.setData("text/html", processed);
+      // Preserve plain text
+      const text = event.clipboardData?.getData("text/plain") || "";
+      if (text) {
+        event.clipboardData?.setData("text/plain", text);
+      }
+    }
+  };
+
+  document.addEventListener("copy", handler);
+
+  // Return cleanup function
+  return () => {
+    document.removeEventListener("copy", handler);
+  };
+}
+
+/** Helper to check if src is a relative path */
+function isRelativePath(src: string): boolean {
+  return (
+    !src.startsWith("data:") &&
+    !src.startsWith("http:") &&
+    !src.startsWith("https:") &&
+    !src.startsWith("blob:") &&
+    !src.startsWith("placeholder:")
+  );
 }
