@@ -1,0 +1,74 @@
+import { ulid } from "ulid";
+import type { FileSystemProvider } from "./filesystem";
+import type { Notebook } from "./notebook";
+
+/** Allowed MIME types mapped to file extensions */
+const ALLOWED_TYPES: Record<string, string> = {
+  "image/png": ".png",
+  "image/jpeg": ".jpg",
+  "image/gif": ".gif",
+};
+
+export interface ImageSaveResult {
+  /** Relative path within note directory (just the filename) */
+  relativePath: string;
+}
+
+/**
+ * Check if a MIME type is allowed for image upload.
+ */
+export function isAllowedImageType(mimeType: string): boolean {
+  return mimeType in ALLOWED_TYPES;
+}
+
+/**
+ * Sanitize filename for filesystem safety.
+ * Removes special characters, limits length.
+ */
+function sanitizeFilename(name: string): string {
+  // Remove extension if present
+  const base = name.replace(/\.[^.]+$/, "");
+  // Keep only alphanumeric, dash, underscore
+  const sanitized = base.replace(/[^a-zA-Z0-9_-]/g, "").substring(0, 50);
+  return sanitized;
+}
+
+/**
+ * Generate image filename: ULID[-sanitizedFilename].ext
+ */
+export function generateImageFilename(
+  originalName: string,
+  mimeType: string,
+): string {
+  const ext = ALLOWED_TYPES[mimeType];
+  if (!ext) {
+    throw new Error(`Unsupported MIME type: ${mimeType}`);
+  }
+
+  const id = ulid();
+  const sanitized = sanitizeFilename(originalName);
+
+  return sanitized ? `${id}-${sanitized}${ext}` : `${id}${ext}`;
+}
+
+/**
+ * Save image file to note directory.
+ */
+export async function saveImage(
+  fs: FileSystemProvider,
+  notebook: Notebook,
+  notePath: string,
+  file: File,
+): Promise<ImageSaveResult> {
+  if (!isAllowedImageType(file.type)) {
+    throw new Error(`Unsupported image type: ${file.type}`);
+  }
+
+  const filename = generateImageFilename(file.name, file.type);
+  const data = await file.arrayBuffer();
+
+  // Path: notePath/filename (e.g., 2026/02/07/1/ULID.png)
+  await fs.writeBinaryFile(notebook.handle, `${notePath}/${filename}`, data);
+
+  return { relativePath: filename };
+}

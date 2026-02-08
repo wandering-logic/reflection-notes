@@ -22,7 +22,7 @@ followed by one or more blocks.
 ```
 Document       <- Title Created Labels Block+
 
-Title          <- Inline*
+Title          <- Inline*                  ; h1
 Created        <- immutable date
 Labels         <- Label*
 Label          <- Text
@@ -33,7 +33,7 @@ LeafBlock      <- Paragraph | Section | CodeBlock | MathDisplay | HorizontalRule
 ContainerBlock <- Blockquote | List
 
 Paragraph      <- Inline*
-Section        <- Inline*                    ; level ∈ {1,2,3,4}
+Section        <- Inline*                    ; level ∈ {2, 3, 4, 5}
 CodeBlock      <- Text*                      ; marks forbidden
 HorizontalRule <- ε                          ; atomic
 
@@ -52,5 +52,11 @@ Mark           <- Strong | Em | Code | Link | Strikethrough ; this is not tree s
 MathInline     <- LaTeXSource          ; inline atom node
 MathDisplay    <- LaTeXSource          ; block atom node
 LaTeXSource    <- text*                ; marks forbidden
+
+Image          <- src, alt?, title?    ; inline atom node
+                                       ; src: relative path (string)
+                                       ; alt: plain text (string)
+                                       ; title: plain text (string)
+
 ```
 

@@ -1,10 +1,6 @@
 import { Schema } from "prosemirror-model";
 import { marks, nodes } from "prosemirror-schema-basic";
-import {
-  bulletList,
-  listItem,
-  orderedList,
-} from "prosemirror-schema-list";
+import { bulletList, listItem, orderedList } from "prosemirror-schema-list";
 
 function formatTimestamp(ts: number): string {
   const date = new Date(ts);
@@ -105,13 +101,61 @@ export const schema = new Schema({
       content: "block+",
     },
     text: nodes.text,
-    // image: add later
+    image: {
+      inline: true,
+      atom: true,
+      attrs: {
+        src: { validate: "string" },
+        alt: { default: null, validate: "string|null" },
+        title: { default: null, validate: "string|null" },
+      },
+      group: "inline",
+      draggable: true,
+      parseDOM: [
+        {
+          tag: "img[src]",
+          getAttrs(dom) {
+            const el = dom as HTMLElement;
+            return {
+              src: el.getAttribute("src"),
+              alt: el.getAttribute("alt"),
+              title: el.getAttribute("title"),
+            };
+          },
+        },
+      ],
+      toDOM(node) {
+        const { src, alt, title } = node.attrs;
+        const attrs: Record<string, string> = { src, class: "pm-image" };
+        if (alt) attrs.alt = alt;
+        if (title) attrs.title = title;
+        return ["img", attrs];
+      },
+    },
   },
   marks: {
     strong: marks.strong,
     em: marks.em,
     code: marks.code,
-    link: marks.link,
+    link: {
+      ...marks.link,
+      parseDOM: [
+        {
+          tag: "a[href]",
+          getAttrs(dom) {
+            const href = (dom as HTMLElement).getAttribute("href") || "";
+            // Only allow safe URL schemes (http, https, mailto) and relative paths
+            if (!/^(https?|mailto):/i.test(href) && !href.startsWith("/")) {
+              return false; // Reject this link
+            }
+            return {
+              href,
+              title: (dom as HTMLElement).getAttribute("title"),
+            };
+          },
+        },
+      ],
+    },
     strikethrough: {
       parseDOM: [
         { tag: "s" },

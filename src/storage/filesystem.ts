@@ -17,6 +17,19 @@ export interface FileSystemProvider {
     content: string,
   ): Promise<void>;
 
+  /** Read a binary file at path relative to dir */
+  readBinaryFile(
+    dir: FileSystemDirectoryHandle,
+    path: string,
+  ): Promise<ArrayBuffer>;
+
+  /** Write a binary file at path relative to dir (creates parent dirs as needed) */
+  writeBinaryFile(
+    dir: FileSystemDirectoryHandle,
+    path: string,
+    data: ArrayBuffer,
+  ): Promise<void>;
+
   /** Create directory at path relative to dir (creates parents as needed) */
   mkdir(
     dir: FileSystemDirectoryHandle,
@@ -86,6 +99,38 @@ export class LocalFileSystemProvider implements FileSystemProvider {
     const fileHandle = await current.getFileHandle(fileName, { create: true });
     const writable = await fileHandle.createWritable();
     await writable.write(content);
+    await writable.close();
+  }
+
+  async readBinaryFile(
+    dir: FileSystemDirectoryHandle,
+    path: string,
+  ): Promise<ArrayBuffer> {
+    const handle = await this.getFileHandle(dir, path);
+    const file = await handle.getFile();
+    return await file.arrayBuffer();
+  }
+
+  async writeBinaryFile(
+    dir: FileSystemDirectoryHandle,
+    path: string,
+    data: ArrayBuffer,
+  ): Promise<void> {
+    // Ensure parent directories exist
+    const parts = path.split("/");
+    const fileName = parts.pop();
+    if (!fileName) {
+      throw new Error("Invalid path: empty filename");
+    }
+    let current = dir;
+
+    for (const part of parts) {
+      current = await current.getDirectoryHandle(part, { create: true });
+    }
+
+    const fileHandle = await current.getFileHandle(fileName, { create: true });
+    const writable = await fileHandle.createWritable();
+    await writable.write(new Blob([data]));
     await writable.close();
   }
 

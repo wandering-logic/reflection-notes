@@ -348,3 +348,14 @@ body {
 #update-dismiss:hover {
   background: #444;
 }
+
+/* Images in editor */
+.ProseMirror img.pm-image {
+  max-width: 100%;
+  height: auto;
+  cursor: pointer;
+}
+.ProseMirror img.pm-image-selected {
+  outline: 2px solid #007bff;
+  outline-offset: 2px;
+}

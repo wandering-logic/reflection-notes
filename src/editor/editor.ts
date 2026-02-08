@@ -15,11 +15,14 @@ import {
 } from "prosemirror-schema-list";
 import {
   EditorState,
+  NodeSelection,
   Plugin,
   Selection,
   type Transaction,
 } from "prosemirror-state";
 import { Decoration, DecorationSet, EditorView } from "prosemirror-view";
+import { isAllowedImageType } from "../storage/image";
+import { addImageBlobUrl, createImageNodeView } from "./imageNodeView";
 import { schema } from "./schema";
 
 const markKeymap = keymap({
@@ -136,6 +139,25 @@ const changeListeners = new WeakMap<EditorView, () => void>();
 // Selection change listeners per view
 const selectionListeners = new WeakMap<EditorView, () => void>();
 
+// Image paste context per view
+export interface ImagePasteContext {
+  /** Save image file and return its relative path */
+  saveImage: (file: File) => Promise<{ relativePath: string }>;
+}
+
+const imagePasteContexts = new WeakMap<EditorView, ImagePasteContext>();
+
+/**
+ * Set the image paste context for a view.
+ * Called from main.ts when a note is loaded/created.
+ */
+export function setImagePasteContext(
+  view: EditorView,
+  context: ImagePasteContext,
+): void {
+  imagePasteContexts.set(view, context);
+}
+
 export function mountEditor(host: HTMLElement): EditorView {
   // Create initial document with current timestamp
   const doc = schema.nodes.doc.create(null, [
@@ -147,6 +169,9 @@ export function mountEditor(host: HTMLElement): EditorView {
 
   const view = new EditorView(host, {
     state,
+    nodeViews: {
+      image: createImageNodeView,
+    },
     dispatchTransaction(tr) {
       if (tr.getMeta("uiEvent") === "paste") {
         console.log("Paste transaction steps:", tr.steps);
@@ -171,7 +196,59 @@ export function mountEditor(host: HTMLElement): EditorView {
       console.log("Slice nodes:", slice.content);
       return slice;
     },
-    handlePaste(view, _event, slice) {
+    handlePaste(view, event, slice) {
+      const files = event.clipboardData?.files;
+
+      // Check for image files first
+      if (files && files.length > 0) {
+        const imageFiles: File[] = [];
+        for (let i = 0; i < files.length; i++) {
+          const file = files[i];
+          if (file.type.startsWith("image/") && isAllowedImageType(file.type)) {
+            imageFiles.push(file);
+          }
+        }
+
+        if (imageFiles.length > 0) {
+          const context = imagePasteContexts.get(view);
+          if (!context) {
+            console.warn("No image paste context available");
+            return false;
+          }
+
+          const { state } = view;
+          const { $from } = state.selection;
+          const docIndex = $from.index(0);
+
+          // Don't allow images in title (index 0) or created (index 1)
+          if (docIndex < 2) {
+            return true; // Consume event but do nothing
+          }
+
+          // Process images asynchronously
+          Promise.all(
+            imageFiles.map(async (file) => {
+              const result = await context.saveImage(file);
+              // Create blob URL for immediate display
+              const blobUrl = URL.createObjectURL(file);
+              addImageBlobUrl(view, result.relativePath, blobUrl);
+              return schema.nodes.image.create({
+                src: result.relativePath,
+                alt: file.name,
+              });
+            }),
+          ).then((imageNodes) => {
+            const tr = view.state.tr;
+            for (const node of imageNodes) {
+              tr.replaceSelectionWith(node);
+            }
+            view.dispatch(tr);
+          });
+
+          return true; // Consume the paste event
+        }
+      }
+
       // Check if slice contains block-level nodes
       let hasBlockContent = false;
       slice.content.forEach((node) => {
@@ -186,17 +263,19 @@ export function mountEditor(host: HTMLElement): EditorView {
       const { $from } = state.selection;
       const docIndex = $from.index(0);
 
-      // Pasting into title - extract inline content only
+      // Pasting into title - extract inline content only, filtering out images
       if (docIndex === 0) {
-        // Collect all inline content from pasted blocks
+        // Collect all inline content from pasted blocks, excluding images
         const inlineNodes: Node[] = [];
         slice.content.forEach((node) => {
           if (node.isBlock) {
             // Extract inline content from blocks
             node.content.forEach((child) => {
-              inlineNodes.push(child);
+              if (child.type.name !== "image") {
+                inlineNodes.push(child);
+              }
             });
-          } else {
+          } else if (node.type.name !== "image") {
             inlineNodes.push(node);
           }
         });
@@ -450,6 +529,14 @@ export function isInsideOrderedList(view: EditorView): boolean {
     if ($from.node(depth).type.name === "ordered_list") {
       return true;
     }
+  }
+  return false;
+}
+
+export function isImageSelected(view: EditorView): boolean {
+  const { selection } = view.state;
+  if (selection instanceof NodeSelection) {
+    return selection.node.type.name === "image";
   }
   return false;
 }

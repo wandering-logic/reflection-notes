@@ -2,7 +2,9 @@ import "./style.css";
 import "prosemirror-view/style/prosemirror.css";
 import { registerSW } from "virtual:pwa-register";
 import * as Editor from "./editor/editor";
+import { addImageBlobUrl, setImageBlobUrls } from "./editor/imageNodeView";
 import { LocalFileSystemProvider } from "./storage/filesystem";
+import { saveImage } from "./storage/image";
 
 // Register service worker and handle updates
 const updateSW = registerSW({
@@ -207,6 +209,12 @@ app.innerHTML = `
           <svg viewBox="0 0 24 24"><path d="M11 6h9"/><path d="M11 12h9"/><path d="M12 18h8"/><path d="M4 16a2 2 0 1 1 4 0c0 .591 -.5 1 -1 1.5l-3 2.5h4"/><path d="M6 10v-6l-2 2"/></svg>
         </button>
       </div>
+      <div class="toolbar-separator"></div>
+      <div class="toolbar-group">
+        <button class="toolbar-btn" id="tb-image" title="Image">
+          <svg viewBox="0 0 24 24"><path d="M15 8h.01"/><path d="M3 6a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v12a3 3 0 0 1 -3 3h-12a3 3 0 0 1 -3 -3v-12z"/><path d="M3 16l5 -5c.928 -.893 2.072 -.893 3 0l5 5"/><path d="M14 14l1 -1c.928 -.893 2.072 -.893 3 0l3 3"/></svg>
+        </button>
+      </div>
     </div>
 
     <div class="body">
@@ -312,10 +320,12 @@ document.querySelector("#format-bullet-list")?.addEventListener("click", () => {
   view.focus();
 });
 
-document.querySelector("#format-ordered-list")?.addEventListener("click", () => {
-  Editor.toggleOrderedList(view);
-  view.focus();
-});
+document
+  .querySelector("#format-ordered-list")
+  ?.addEventListener("click", () => {
+    Editor.toggleOrderedList(view);
+    view.focus();
+  });
 
 document.querySelector("#format-hr")?.addEventListener("click", () => {
   Editor.insertHorizontalRule(view);
@@ -462,6 +472,7 @@ async function handleNewNote() {
 
   // Load into editor
   Editor.setContent(view, note.content);
+  setupImagePasteContext();
   updateTitle();
   view.focus();
 }
@@ -518,6 +529,8 @@ async function handleOpenNote() {
 
   // Load into editor
   Editor.setContent(view, note.content);
+  setupImagePasteContext();
+  await loadImageBlobUrls();
   updateTitle();
   view.focus();
 }
@@ -532,6 +545,7 @@ async function handleNewNotebook() {
     currentNote = note;
 
     Editor.setContent(view, note.content);
+    setupImagePasteContext();
     updateTitle();
     hideWelcomeDialog();
     view.focus();
@@ -556,6 +570,8 @@ async function handleOpenNotebook() {
         const note = await loadNote(fs, notebook, notebook.meta.lastOpenedNote);
         currentNote = note;
         Editor.setContent(view, note.content);
+        setupImagePasteContext();
+        await loadImageBlobUrls();
       } catch {
         // Last note doesn't exist, create a new one
         const note = await createNote(fs, notebook);
@@ -563,6 +579,7 @@ async function handleOpenNotebook() {
         notebook.meta.lastOpenedNote = note.path;
         await saveNotebookMeta(fs, notebook);
         Editor.setContent(view, note.content);
+        setupImagePasteContext();
       }
     } else {
       // No last note, create a new one
@@ -571,6 +588,7 @@ async function handleOpenNotebook() {
       notebook.meta.lastOpenedNote = note.path;
       await saveNotebookMeta(fs, notebook);
       Editor.setContent(view, note.content);
+      setupImagePasteContext();
     }
 
     updateTitle();
@@ -588,6 +606,64 @@ async function saveCurrentNote() {
 
   currentNote.content = view.state.doc.toJSON();
   await saveNote(fs, currentNotebook, currentNote);
+}
+
+/**
+ * Set up image paste context for the current note.
+ * Must be called after loading/creating a note.
+ */
+function setupImagePasteContext() {
+  if (!currentNotebook || !currentNote) return;
+
+  const notebook = currentNotebook;
+  const notePath = currentNote.path;
+
+  Editor.setImagePasteContext(view, {
+    saveImage: async (file: File) => {
+      const result = await saveImage(fs, notebook, notePath, file);
+      // Create blob URL for immediate display
+      const blobUrl = URL.createObjectURL(file);
+      addImageBlobUrl(view, result.relativePath, blobUrl);
+      return result;
+    },
+  });
+}
+
+/**
+ * Load blob URLs for all images referenced in the current document.
+ * Must be called after loading a note.
+ */
+async function loadImageBlobUrls() {
+  if (!currentNotebook || !currentNote) return;
+
+  const urls = new Map<string, string>();
+
+  // Walk document to find all image nodes
+  const doc = view.state.doc;
+  doc.descendants((node) => {
+    if (node.type.name === "image") {
+      const src = node.attrs.src as string;
+      if (src && !urls.has(src)) {
+        urls.set(src, ""); // Placeholder, will be filled below
+      }
+    }
+  });
+
+  // Load each image
+  for (const relativePath of urls.keys()) {
+    try {
+      const data = await fs.readBinaryFile(
+        currentNotebook.handle,
+        `${currentNote.path}/${relativePath}`,
+      );
+      const blob = new Blob([data]);
+      urls.set(relativePath, URL.createObjectURL(blob));
+    } catch (e) {
+      console.warn(`Failed to load image: ${relativePath}`, e);
+    }
+  }
+
+  setImageBlobUrls(view, urls);
 }
 
 document
@@ -658,6 +734,8 @@ async function handleReconnect() {
         const note = await loadNote(fs, notebook, notebook.meta.lastOpenedNote);
         currentNote = note;
         Editor.setContent(view, note.content);
+        setupImagePasteContext();
+        await loadImageBlobUrls();
       } catch {
         // Last note doesn't exist, create a new one
         const note = await createNote(fs, notebook);
@@ -665,6 +743,7 @@ async function handleReconnect() {
         notebook.meta.lastOpenedNote = note.path;
         await saveNotebookMeta(fs, notebook);
         Editor.setContent(view, note.content);
+        setupImagePasteContext();
       }
     } else {
       // No last note, create a new one
@@ -673,6 +752,7 @@ async function handleReconnect() {
       notebook.meta.lastOpenedNote = note.path;
       await saveNotebookMeta(fs, notebook);
       Editor.setContent(view, note.content);
+      setupImagePasteContext();
     }
 
     updateTitle();
@@ -740,6 +820,7 @@ const tbBulletList =
 const tbOrderedList =
   document.querySelector<HTMLButtonElement>("#tb-ordered-list");
 const tbCodeBlock = document.querySelector<HTMLButtonElement>("#tb-code-block");
+const tbImage = document.querySelector<HTMLButtonElement>("#tb-image");
 
 function updateToolbarState() {
   // Update inline mark buttons
@@ -763,6 +844,9 @@ function updateToolbarState() {
   tbBlockquote?.classList.toggle("active", Editor.isInsideBlockquote(view));
   tbBulletList?.classList.toggle("active", Editor.isInsideBulletList(view));
   tbOrderedList?.classList.toggle("active", Editor.isInsideOrderedList(view));
+
+  // Image button - show active when image is selected
+  tbImage?.classList.toggle("active", Editor.isImageSelected(view));
 }
 
 Editor.onSelectionChange(view, () => {
@@ -796,6 +880,8 @@ async function startup() {
         const note = await loadNote(fs, notebook, notebook.meta.lastOpenedNote);
         currentNote = note;
         Editor.setContent(view, note.content);
+        setupImagePasteContext();
+        await loadImageBlobUrls();
         updateTitle();
         view.focus();
         return;
@@ -806,6 +892,7 @@ async function startup() {
         notebook.meta.lastOpenedNote = note.path;
         await saveNotebookMeta(fs, notebook);
         Editor.setContent(view, note.content);
+        setupImagePasteContext();
         updateTitle();
         view.focus();
         return;
@@ -817,6 +904,7 @@ async function startup() {
       notebook.meta.lastOpenedNote = note.path;
       await saveNotebookMeta(fs, notebook);
       Editor.setContent(view, note.content);
+      setupImagePasteContext();
       updateTitle();
       view.focus();
       return;
