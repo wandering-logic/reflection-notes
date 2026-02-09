@@ -9,6 +9,23 @@ const ALLOWED_TYPES: Record<string, string> = {
   "image/gif": ".gif",
 };
 
+/** Extension to MIME type mapping (reverse of ALLOWED_TYPES) */
+const EXT_TO_MIME: Record<string, string> = {
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".gif": "image/gif",
+};
+
+/**
+ * Get MIME type from file extension.
+ * Returns undefined if extension is not recognized.
+ */
+export function getMimeTypeFromExtension(filename: string): string | undefined {
+  const ext = filename.match(/\.[^.]+$/)?.[0]?.toLowerCase();
+  return ext ? EXT_TO_MIME[ext] : undefined;
+}
+
 export interface ImageSaveResult {
   /** Relative path within note directory (just the filename) */
   relativePath: string;

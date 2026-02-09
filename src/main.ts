@@ -5,6 +5,7 @@ import * as Editor from "./editor/editor";
 import { addImageBlobUrl, setAssetLoadContext } from "./editor/imageNodeView";
 import { LocalFileSystemProvider } from "./storage/filesystem";
 import {
+  getMimeTypeFromExtension,
   isAllowedImageType,
   parseDataUrl,
   saveImage,
@@ -721,7 +722,8 @@ function setupAssetLoadContext() {
         notebook.handle,
         `${notePath}/${relativePath}`,
       );
-      return new Blob([data]);
+      const mimeType = getMimeTypeFromExtension(relativePath);
+      return new Blob([data], mimeType ? { type: mimeType } : undefined);
     },
   });
 }

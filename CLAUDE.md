@@ -98,6 +98,24 @@ gh issue view 17 --json title,body,state   # correct
 gh issue view 17                            # errors on projectCards field
 ```
 
+## Browser Clipboard API Limitations
+
+The Async Clipboard API (`navigator.clipboard.write()`) only supports three MIME types:
+- `text/plain`
+- `text/html`
+- `image/png`
+
+**No JPEG, GIF, or other image formats.** Images must be converted to PNG before writing to clipboard for external apps (GIMP, etc.) to read them. This is a W3C spec limitation, not a browser bug.
+
+Additionally, when creating Blobs from binary data (e.g., loading images from filesystem), you must explicitly set the MIME type - it won't be inferred:
+```typescript
+// Wrong - blob.type will be empty string
+new Blob([data])
+
+// Correct - derive type from file extension
+new Blob([data], { type: "image/jpeg" })
+```
+
 ## Planning Complex Features
 
 Before designing solutions, enumerate the complete problem space:

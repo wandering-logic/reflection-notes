@@ -854,14 +854,16 @@ export function setupCopyHandler(view: EditorView): () => void {
 
       const blob = getImageBlob(view, src);
       const dataUrl = getImageDataUrl(view, src);
-
+      
       if (blob && dataUrl) {
         event.preventDefault();
 
         try {
-          // Write to clipboard using async Clipboard API
+          // Clipboard API only supports image/png, so convert if needed
+          const pngBlob = await convertToPng(blob);
+
           const clipboardItem = new ClipboardItem({
-            [blob.type]: blob,
+            "image/png": pngBlob,
             "text/html": new Blob([`<img src="${dataUrl}">`], {
               type: "text/html",
             }),
@@ -909,6 +911,45 @@ export function setupCopyHandler(view: EditorView): () => void {
   return () => {
     document.removeEventListener("copy", handler);
   };
+}
+
+/** Convert any image blob to PNG (Clipboard API only supports PNG) */
+async function convertToPng(blob: Blob): Promise<Blob> {
+  if (blob.type === "image/png") {
+    return blob;
+  }
+
+  const img = new Image();
+  const blobUrl = URL.createObjectURL(blob);
+
+  try {
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error("Failed to load image"));
+      img.src = blobUrl;
+    });
+
+    const canvas = document.createElement("canvas");
+    canvas.width = img.naturalWidth;
+    canvas.height = img.naturalHeight;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Failed to get canvas context");
+
+    ctx.drawImage(img, 0, 0);
+
+    return new Promise((resolve, reject) => {
+      canvas.toBlob(
+        (pngBlob) => {
+          if (pngBlob) resolve(pngBlob);
+          else reject(new Error("Failed to convert to PNG"));
+        },
+        "image/png",
+      );
+    });
+  } finally {
+    URL.revokeObjectURL(blobUrl);
+  }
 }
 
 /** Helper to check if src is a relative path */
