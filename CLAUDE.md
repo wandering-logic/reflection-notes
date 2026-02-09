@@ -97,3 +97,15 @@ Always use `--json` with `gh issue view` to avoid GraphQL deprecation errors:
 gh issue view 17 --json title,body,state   # correct
 gh issue view 17                            # errors on projectCards field
 ```
+
+## Planning Complex Features
+
+Before designing solutions, enumerate the complete problem space:
+
+1. **What happens today?** Trace the actual mechanism - don't assume. For I/O features (clipboard, file save/load, network), map both directions together.
+
+2. **Enumerate all cases.** List every input variant, output variant, and the cross-product of scenarios. Ask: "What bytes/data actually flow through the system in each case?"
+
+3. **Identify the coupling.** Features that seem separate often share a communication channel (clipboard, file format, API). Design them together, not as afterthoughts to each other.
+
+Only after this enumeration should you design the implementation.
