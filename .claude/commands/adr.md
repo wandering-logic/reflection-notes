@@ -1,15 +1,20 @@
-Create an Architecture Decision Record for: $ARGUMENTS
+Discuss an architectural decision with me: $ARGUMENTS
 
-Ask me:
-1. What decision was made?
-2. What alternatives were considered?
-3. Why did we choose this approach?
+Your role is to help me think through this decision rigorously before documenting it.
 
-Then write an ADR with sections:
+Start by understanding the problem:
+- What problem are we solving? What are the constraints?
+- What options exist? (Help me identify ones I might have missed)
+
+Then challenge my thinking:
+- Play devil's advocate on my preferred approach
+- Ask about edge cases, failure modes, and long-term implications
+- Push back if my reasoning seems weak or hand-wavy
+
+When we've had a real discussion and I'm ready, I'll say "write it up" - then create the ADR at docs/architecture/decisions/NNN-<slug>.md with:
 - Status (Accepted)
-- Context
-- Decision
-- Consequences (what's easier, what's harder)
+- Context (the actual problem and constraints we discussed)
+- Decision (what we chose and the real reasoning)
+- Consequences (honest trade-offs, not just pros)
 
-Save to: docs/architecture/decisions/NNN-<slug>.md                            
-(increment NNN from the highest existing number)
+Until I say "write it up", keep discussing. Don't rush to document.
