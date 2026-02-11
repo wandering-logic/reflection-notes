@@ -1,5 +1,12 @@
-import { describe, expect, it } from "vitest";
-import { createBlankDocument, extractCreated, extractTitle } from "./note";
+import { describe, expect, it, vi } from "vitest";
+import type { FileSystemProvider } from "./filesystem";
+import {
+  createBlankDocument,
+  extractCreated,
+  extractTitle,
+  loadNoteOrCreateDefault,
+} from "./note";
+import type { Notebook } from "./notebook";
 
 describe("extractTitle", () => {
   it("extracts title from valid document", () => {
@@ -234,5 +241,97 @@ describe("createBlankDocument", () => {
     const serialized = JSON.stringify(doc);
     const parsed = JSON.parse(serialized);
     expect(parsed).toEqual(doc);
+  });
+});
+
+describe("loadNoteOrCreateDefault", () => {
+  function createMockFs(options: {
+    noteExists?: boolean;
+    noteContent?: unknown;
+  }): FileSystemProvider {
+    const { noteExists = false, noteContent } = options;
+
+    return {
+      readTextFile: vi.fn().mockImplementation(() => {
+        if (noteExists && noteContent) {
+          return Promise.resolve(JSON.stringify(noteContent));
+        }
+        return Promise.reject(new Error("File not found"));
+      }),
+      writeTextFile: vi.fn().mockResolvedValue(undefined),
+      mkdir: vi.fn().mockResolvedValue({} as FileSystemDirectoryHandle),
+      exists: vi.fn().mockResolvedValue(false),
+      // These are not used by loadNoteOrCreateDefault but required by interface
+      pickDirectory: vi.fn(),
+      listDir: vi.fn(),
+      readBinaryFile: vi.fn(),
+      writeBinaryFile: vi.fn(),
+      persistHandle: vi.fn(),
+      getPersistedHandle: vi.fn(),
+      requestPermission: vi.fn(),
+    } as unknown as FileSystemProvider;
+  }
+
+  function createMockNotebook(): Notebook {
+    return {
+      handle: {} as FileSystemDirectoryHandle,
+      meta: { version: 1, lastOpenedNote: null },
+      name: "Test Notebook",
+    };
+  }
+
+  it("loads existing note when path is valid", async () => {
+    const noteContent = createBlankDocument(1234567890);
+    const fs = createMockFs({ noteExists: true, noteContent });
+    const notebook = createMockNotebook();
+
+    const result = await loadNoteOrCreateDefault(fs, notebook, "2026/01/15/1");
+
+    expect(result.didCreate).toBe(false);
+    expect(result.note.path).toBe("2026/01/15/1");
+    expect(result.note.content).toEqual(noteContent);
+    expect(fs.readTextFile).toHaveBeenCalledWith(
+      notebook.handle,
+      "2026/01/15/1/note.json",
+    );
+  });
+
+  it("creates new note when path is null", async () => {
+    const fs = createMockFs({ noteExists: false });
+    const notebook = createMockNotebook();
+
+    const result = await loadNoteOrCreateDefault(fs, notebook, null);
+
+    expect(result.didCreate).toBe(true);
+    expect(result.note.path).toMatch(/^\d{4}\/\d{2}\/\d{2}\/\d+$/);
+    expect(fs.writeTextFile).toHaveBeenCalled();
+  });
+
+  it("creates new note when existing path fails to load", async () => {
+    const fs = createMockFs({ noteExists: false });
+    const notebook = createMockNotebook();
+
+    const result = await loadNoteOrCreateDefault(
+      fs,
+      notebook,
+      "2026/01/15/1", // This path will fail to load
+    );
+
+    expect(result.didCreate).toBe(true);
+    expect(result.note.path).toMatch(/^\d{4}\/\d{2}\/\d{2}\/\d+$/);
+    // Should have tried to read, then created new
+    expect(fs.readTextFile).toHaveBeenCalled();
+    expect(fs.writeTextFile).toHaveBeenCalled();
+  });
+
+  it("returns note with valid content when creating", async () => {
+    const fs = createMockFs({ noteExists: false });
+    const notebook = createMockNotebook();
+
+    const result = await loadNoteOrCreateDefault(fs, notebook, null);
+
+    // Created note should have valid extractable title and created timestamp
+    expect(extractTitle(result.note.content)).toBe("Untitled");
+    expect(extractCreated(result.note.content)).toBeGreaterThan(0);
   });
 });

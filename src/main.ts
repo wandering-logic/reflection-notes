@@ -44,6 +44,7 @@ import {
   extractTitle,
   listNotes,
   loadNote,
+  loadNoteOrCreateDefault,
   type Note,
   saveNote,
 } from "./storage/note";
@@ -577,34 +578,21 @@ async function handleOpenNotebook() {
     currentNotebook = notebook;
 
     // Load last opened note, or create a new one
-    if (notebook.meta.lastOpenedNote) {
-      try {
-        const note = await loadNote(fs, notebook, notebook.meta.lastOpenedNote);
-        currentNote = note;
-        setupAssetLoadContext();
-        Editor.setContent(view, note.content);
-        setupImagePasteContext();
-      } catch {
-        // Last note doesn't exist, create a new one
-        const note = await createNote(fs, notebook);
-        currentNote = note;
-        notebook.meta.lastOpenedNote = note.path;
-        await saveNotebookMeta(fs, notebook);
-        setupAssetLoadContext();
-        Editor.setContent(view, note.content);
-        setupImagePasteContext();
-      }
-    } else {
-      // No last note, create a new one
-      const note = await createNote(fs, notebook);
-      currentNote = note;
+    const { note, didCreate } = await loadNoteOrCreateDefault(
+      fs,
+      notebook,
+      notebook.meta.lastOpenedNote,
+    );
+    currentNote = note;
+
+    if (didCreate) {
       notebook.meta.lastOpenedNote = note.path;
       await saveNotebookMeta(fs, notebook);
-      setupAssetLoadContext();
-      Editor.setContent(view, note.content);
-      setupImagePasteContext();
     }
 
+    setupAssetLoadContext();
+    Editor.setContent(view, note.content);
+    setupImagePasteContext();
     updateTitle();
     hideWelcomeDialog();
     view.focus();
@@ -792,34 +780,21 @@ async function handleReconnect() {
     currentNotebook = notebook;
 
     // Load last opened note, or create a new one
-    if (notebook.meta.lastOpenedNote) {
-      try {
-        const note = await loadNote(fs, notebook, notebook.meta.lastOpenedNote);
-        currentNote = note;
-        setupAssetLoadContext();
-        Editor.setContent(view, note.content);
-        setupImagePasteContext();
-      } catch {
-        // Last note doesn't exist, create a new one
-        const note = await createNote(fs, notebook);
-        currentNote = note;
-        notebook.meta.lastOpenedNote = note.path;
-        await saveNotebookMeta(fs, notebook);
-        setupAssetLoadContext();
-        Editor.setContent(view, note.content);
-        setupImagePasteContext();
-      }
-    } else {
-      // No last note, create a new one
-      const note = await createNote(fs, notebook);
-      currentNote = note;
+    const { note, didCreate } = await loadNoteOrCreateDefault(
+      fs,
+      notebook,
+      notebook.meta.lastOpenedNote,
+    );
+    currentNote = note;
+
+    if (didCreate) {
       notebook.meta.lastOpenedNote = note.path;
       await saveNotebookMeta(fs, notebook);
-      setupAssetLoadContext();
-      Editor.setContent(view, note.content);
-      setupImagePasteContext();
     }
 
+    setupAssetLoadContext();
+    Editor.setContent(view, note.content);
+    setupImagePasteContext();
     updateTitle();
     hideReconnectDialog();
     view.focus();
@@ -938,43 +913,25 @@ async function startup() {
     // Permission granted - load normally
     currentNotebook = notebook;
 
-    // Load last opened note
-    if (notebook.meta.lastOpenedNote) {
-      try {
-        const note = await loadNote(fs, notebook, notebook.meta.lastOpenedNote);
-        currentNote = note;
-        setupAssetLoadContext();
-        Editor.setContent(view, note.content);
-        setupImagePasteContext();
-        updateTitle();
-        view.focus();
-        return;
-      } catch {
-        // Note doesn't exist anymore, create a new one
-        const note = await createNote(fs, notebook);
-        currentNote = note;
-        notebook.meta.lastOpenedNote = note.path;
-        await saveNotebookMeta(fs, notebook);
-        setupAssetLoadContext();
-        Editor.setContent(view, note.content);
-        setupImagePasteContext();
-        updateTitle();
-        view.focus();
-        return;
-      }
-    } else {
-      // No last note, create one
-      const note = await createNote(fs, notebook);
-      currentNote = note;
+    // Load last opened note, or create a new one
+    const { note, didCreate } = await loadNoteOrCreateDefault(
+      fs,
+      notebook,
+      notebook.meta.lastOpenedNote,
+    );
+    currentNote = note;
+
+    if (didCreate) {
       notebook.meta.lastOpenedNote = note.path;
       await saveNotebookMeta(fs, notebook);
-      setupAssetLoadContext();
-      Editor.setContent(view, note.content);
-      setupImagePasteContext();
-      updateTitle();
-      view.focus();
-      return;
     }
+
+    setupAssetLoadContext();
+    Editor.setContent(view, note.content);
+    setupImagePasteContext();
+    updateTitle();
+    view.focus();
+    return;
   }
 
   // No previous notebook - show welcome dialog

@@ -158,6 +158,43 @@ export async function saveNote(
 }
 
 /**
+ * Result of loadNoteOrCreateDefault.
+ */
+export interface LoadNoteResult {
+  /** The loaded or created note */
+  note: Note;
+  /** True if a new note was created (caller should update notebook.meta) */
+  didCreate: boolean;
+}
+
+/**
+ * Load a note by path, or create a new one if path is missing or invalid.
+ *
+ * Use this when opening a notebook to restore the last-opened note with fallback.
+ * If a new note is created, the caller should update notebook.meta.lastOpenedNote
+ * and call saveNotebookMeta.
+ */
+export async function loadNoteOrCreateDefault(
+  fs: FileSystemProvider,
+  notebook: Notebook,
+  lastPath: string | null,
+): Promise<LoadNoteResult> {
+  // Try to load the specified note
+  if (lastPath) {
+    try {
+      const note = await loadNote(fs, notebook, lastPath);
+      return { note, didCreate: false };
+    } catch {
+      // Note doesn't exist, fall through to create
+    }
+  }
+
+  // Create a new note
+  const note = await createNote(fs, notebook);
+  return { note, didCreate: true };
+}
+
+/**
  * List all notes in the notebook.
  * Scans directory tree, reads each note.json to extract title.
  * Returns sorted by created date (newest first).
