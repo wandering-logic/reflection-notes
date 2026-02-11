@@ -1,6 +1,7 @@
 import "./style.css";
 import "prosemirror-view/style/prosemirror.css";
 import { registerSW } from "virtual:pwa-register";
+import { AutosaveManager } from "./autosave";
 import * as Editor from "./editor/editor";
 import { addImageBlobUrl, setAssetLoadContext } from "./editor/imageNodeView";
 import { LocalFileSystemProvider } from "./storage/filesystem";
@@ -468,8 +469,8 @@ document.querySelector("#tb-redo")?.addEventListener("click", () => {
 async function handleNewNote() {
   if (!currentNotebook) return;
 
-  // Save current note first
-  await saveCurrentNote();
+  // Flush any pending autosave before switching notes
+  await autosaveManager.flush();
 
   // Create new note
   const note = await createNote(fs, currentNotebook);
@@ -525,8 +526,8 @@ async function handleOpenNote() {
     return;
   }
 
-  // Save current note first
-  await saveCurrentNote();
+  // Flush any pending autosave before switching notes
+  await autosaveManager.flush();
 
   // Load selected note
   const noteInfo = notes[index];
@@ -547,8 +548,8 @@ async function handleOpenNote() {
 
 async function handleNewNotebook() {
   try {
-    // Save current note first
-    await saveCurrentNote();
+    // Flush any pending autosave before switching notebooks
+    await autosaveManager.flush();
 
     const { notebook, note } = await createNotebook(fs);
     currentNotebook = notebook;
@@ -569,8 +570,8 @@ async function handleNewNotebook() {
 
 async function handleOpenNotebook() {
   try {
-    // Save current note first
-    await saveCurrentNote();
+    // Flush any pending autosave before switching notebooks
+    await autosaveManager.flush();
 
     const notebook = await openNotebook(fs);
     currentNotebook = notebook;
@@ -835,25 +836,24 @@ async function handleReconnectDifferent() {
   await handleOpenNotebook();
 }
 
-// Autosave: save after changes, debounced
-let autosaveTimeout: number | null = null;
-
-function scheduleAutosave() {
-  if (!currentNotebook || !currentNote) return;
-
-  if (autosaveTimeout) {
-    clearTimeout(autosaveTimeout);
-  }
-
-  autosaveTimeout = window.setTimeout(async () => {
+// Autosave: explicit state machine for debounced saves
+const autosaveManager = new AutosaveManager({
+  delayMs: 1000,
+  save: async () => {
     await saveCurrentNote();
+  },
+  onAfterSave: () => {
     // Update title in case it changed
     updateTitle();
-  }, 1000);
-}
+  },
+});
 
 // Listen for editor changes
-Editor.onChange(view, scheduleAutosave);
+Editor.onChange(view, () => {
+  if (currentNotebook && currentNote) {
+    autosaveManager.schedule();
+  }
+});
 
 // Update format indicator when selection changes
 const formatIndicator =
