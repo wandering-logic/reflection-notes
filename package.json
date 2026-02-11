@@ -11,14 +11,17 @@
     "lint": "biome check src",
     "lint:fix": "biome check --write src",
     "check": "concurrently \"tsc --noEmit\" \"biome check src\"",
-    "check:watch": "concurrently \"tsc --watch --noEmit\" \"biome check --watch src\""
+    "check:watch": "concurrently \"tsc --watch --noEmit\" \"biome check --watch src\"",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.3.11",
     "concurrently": "^9.2.1",
     "typescript": "~5.9.3",
     "vite": "^7.2.4",
-    "vite-plugin-pwa": "^1.2.0"
+    "vite-plugin-pwa": "^1.2.0",
+    "vitest": "^4.0.18"
   },
   "dependencies": {
     "prosemirror-commands": "^1.7.1",

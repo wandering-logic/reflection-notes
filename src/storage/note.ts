@@ -36,6 +36,10 @@ export function createBlankDocument(timestamp: number): unknown {
  * Returns "Untitled" if title node is empty.
  */
 export function extractTitle(content: unknown): string {
+  if (!content || typeof content !== "object") {
+    return "Untitled";
+  }
+
   const doc = content as {
     content?: Array<{ type: string; content?: Array<{ text?: string }> }>;
   };
@@ -61,6 +65,10 @@ export function extractTitle(content: unknown): string {
  * Extract created timestamp from ProseMirror document JSON.
  */
 export function extractCreated(content: unknown): number {
+  if (!content || typeof content !== "object") {
+    return 0;
+  }
+
   const doc = content as {
     content?: Array<{ type: string; attrs?: { timestamp?: number } }>;
   };

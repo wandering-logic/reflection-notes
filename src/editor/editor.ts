@@ -31,9 +31,9 @@ import {
 import { schema } from "./schema";
 
 /** Categorize image src types */
-type ImageSrcType = "remote" | "data" | "relative" | "blob";
+export type ImageSrcType = "remote" | "data" | "relative" | "blob";
 
-function categorizeImageSrc(src: string): ImageSrcType {
+export function categorizeImageSrc(src: string): ImageSrcType {
   if (src.startsWith("data:")) return "data";
   if (src.startsWith("http://") || src.startsWith("https://")) return "remote";
   if (src.startsWith("blob:")) return "blob";
@@ -854,7 +854,7 @@ export function setupCopyHandler(view: EditorView): () => void {
 
       const blob = getImageBlob(view, src);
       const dataUrl = getImageDataUrl(view, src);
-      
+
       if (blob && dataUrl) {
         event.preventDefault();
 
@@ -939,13 +939,10 @@ async function convertToPng(blob: Blob): Promise<Blob> {
     ctx.drawImage(img, 0, 0);
 
     return new Promise((resolve, reject) => {
-      canvas.toBlob(
-        (pngBlob) => {
-          if (pngBlob) resolve(pngBlob);
-          else reject(new Error("Failed to convert to PNG"));
-        },
-        "image/png",
-      );
+      canvas.toBlob((pngBlob) => {
+        if (pngBlob) resolve(pngBlob);
+        else reject(new Error("Failed to convert to PNG"));
+      }, "image/png");
     });
   } finally {
     URL.revokeObjectURL(blobUrl);

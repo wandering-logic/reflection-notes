@@ -5,12 +5,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Build Commands
 
 ```bash
-npm run dev       # Start Vite dev server
-npm run build     # Type-check with tsc, then bundle with Vite
-npm run preview   # Preview production build
-npm run lint      # Check with Biome (linting + formatting)
-npm run lint:fix  # Auto-fix Biome issues
+npm run dev        # Start Vite dev server
+npm run build      # Type-check with tsc, then bundle with Vite
+npm run preview    # Preview production build
+npm run lint       # Check with Biome (linting + formatting)
+npm run lint:fix   # Auto-fix Biome issues
+npm test           # Run unit tests once
+npm run test:watch # Run tests in watch mode
 ```
+
+**When to run tests:** Run `npm test` after modifying any functions in `src/storage/` or `src/editor/`. Tests cover pure functions like `extractTitle`, `parseDataUrl`, `categorizeImageSrc`, etc. The test suite runs in ~200ms.
 
 ## Project Vision
 

@@ -42,7 +42,7 @@ export function isAllowedImageType(mimeType: string): boolean {
  * Sanitize filename for filesystem safety.
  * Removes special characters, limits length.
  */
-function sanitizeFilename(name: string): string {
+export function sanitizeFilename(name: string): string {
   // Remove extension if present
   const base = name.replace(/\.[^.]+$/, "");
   // Keep only alphanumeric, dash, underscore

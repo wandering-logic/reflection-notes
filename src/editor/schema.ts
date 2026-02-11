@@ -2,7 +2,7 @@ import { Schema } from "prosemirror-model";
 import { marks, nodes } from "prosemirror-schema-basic";
 import { bulletList, listItem, orderedList } from "prosemirror-schema-list";
 
-function formatTimestamp(ts: number): string {
+export function formatTimestamp(ts: number): string {
   const date = new Date(ts);
   return new Intl.DateTimeFormat("en-US", {
     weekday: "long",
