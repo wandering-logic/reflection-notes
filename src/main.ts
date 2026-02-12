@@ -1,6 +1,15 @@
 import "./style.css";
 import "prosemirror-view/style/prosemirror.css";
 import { registerSW } from "virtual:pwa-register";
+import {
+  canSaveNote,
+  getDocumentTitle,
+  getNote,
+  getNotebook,
+  initialState,
+  transition,
+  type AppState,
+} from "./appState";
 import { AutosaveManager } from "./autosave";
 import * as Editor from "./editor/editor";
 import { addImageBlobUrl, setAssetLoadContext } from "./editor/imageNodeView";
@@ -45,12 +54,10 @@ import {
   listNotes,
   loadNote,
   loadNoteOrCreateDefault,
-  type Note,
   saveNote,
 } from "./storage/note";
 import {
   createNotebook,
-  type Notebook,
   openNotebook,
   reconnectNotebook,
   restoreNotebook,
@@ -60,20 +67,11 @@ import {
 // File system provider
 const fs = new LocalFileSystemProvider();
 
-// Current state
-let currentNotebook: Notebook | null = null;
-let currentNote: Note | null = null;
-let pendingReconnectHandle: FileSystemDirectoryHandle | null = null;
+// Application state - explicit state machine
+let appState: AppState = initialState();
 
 function updateTitle() {
-  if (!currentNotebook) {
-    document.title = "Reflection Notes";
-    return;
-  }
-  const noteTitle = currentNote
-    ? extractTitle(currentNote.content)
-    : "Untitled";
-  document.title = `${noteTitle} - ${currentNotebook.name}`;
+  document.title = getDocumentTitle(appState, extractTitle);
 }
 
 const app = document.querySelector<HTMLDivElement>("#app");
@@ -468,18 +466,23 @@ document.querySelector("#tb-redo")?.addEventListener("click", () => {
 // File menu handlers
 
 async function handleNewNote() {
-  if (!currentNotebook) return;
+  const notebook = getNotebook(appState);
+  if (!notebook) return;
 
   // Flush any pending autosave before switching notes
   await autosaveManager.flush();
 
   // Create new note
-  const note = await createNote(fs, currentNotebook);
-  currentNote = note;
+  const note = await createNote(fs, notebook);
+
+  // Transition state
+  const newState = transition(appState, { type: "switch_note", note });
+  if (!newState) return;
+  appState = newState;
 
   // Update notebook meta
-  currentNotebook.meta.lastOpenedNote = note.path;
-  await saveNotebookMeta(fs, currentNotebook);
+  notebook.meta.lastOpenedNote = note.path;
+  await saveNotebookMeta(fs, notebook);
 
   // Load into editor
   setupAssetLoadContext();
@@ -490,9 +493,10 @@ async function handleNewNote() {
 }
 
 async function handleOpenNote() {
-  if (!currentNotebook) return;
+  const notebook = getNotebook(appState);
+  if (!notebook) return;
 
-  const notes = await listNotes(fs, currentNotebook);
+  const notes = await listNotes(fs, notebook);
   if (notes.length === 0) {
     alert("No notes in this notebook.");
     return;
@@ -532,12 +536,16 @@ async function handleOpenNote() {
 
   // Load selected note
   const noteInfo = notes[index];
-  const note = await loadNote(fs, currentNotebook, noteInfo.path);
-  currentNote = note;
+  const note = await loadNote(fs, notebook, noteInfo.path);
+
+  // Transition state
+  const newState = transition(appState, { type: "switch_note", note });
+  if (!newState) return;
+  appState = newState;
 
   // Update notebook meta
-  currentNotebook.meta.lastOpenedNote = note.path;
-  await saveNotebookMeta(fs, currentNotebook);
+  notebook.meta.lastOpenedNote = note.path;
+  await saveNotebookMeta(fs, notebook);
 
   // Load into editor
   setupAssetLoadContext();
@@ -553,8 +561,15 @@ async function handleNewNotebook() {
     await autosaveManager.flush();
 
     const { notebook, note } = await createNotebook(fs);
-    currentNotebook = notebook;
-    currentNote = note;
+
+    // Transition state
+    const newState = transition(appState, {
+      type: "open_notebook",
+      notebook,
+      note,
+    });
+    if (!newState) return;
+    appState = newState;
 
     setupAssetLoadContext();
     Editor.setContent(view, note.content);
@@ -575,7 +590,6 @@ async function handleOpenNotebook() {
     await autosaveManager.flush();
 
     const notebook = await openNotebook(fs);
-    currentNotebook = notebook;
 
     // Load last opened note, or create a new one
     const { note, didCreate } = await loadNoteOrCreateDefault(
@@ -583,7 +597,15 @@ async function handleOpenNotebook() {
       notebook,
       notebook.meta.lastOpenedNote,
     );
-    currentNote = note;
+
+    // Transition state
+    const newState = transition(appState, {
+      type: "open_notebook",
+      notebook,
+      note,
+    });
+    if (!newState) return;
+    appState = newState;
 
     if (didCreate) {
       notebook.meta.lastOpenedNote = note.path;
@@ -604,10 +626,13 @@ async function handleOpenNotebook() {
 }
 
 async function saveCurrentNote() {
-  if (!currentNotebook || !currentNote) return;
+  if (!canSaveNote(appState)) return;
 
-  currentNote.content = view.state.doc.toJSON();
-  await saveNote(fs, currentNotebook, currentNote);
+  const notebook = getNotebook(appState)!;
+  const note = getNote(appState)!;
+
+  note.content = view.state.doc.toJSON();
+  await saveNote(fs, notebook, note);
 }
 
 /**
@@ -615,10 +640,11 @@ async function saveCurrentNote() {
  * Must be called after loading/creating a note.
  */
 function setupImagePasteContext() {
-  if (!currentNotebook || !currentNote) return;
+  const notebook = getNotebook(appState);
+  const note = getNote(appState);
+  if (!notebook || !note) return;
 
-  const notebook = currentNotebook;
-  const notePath = currentNote.path;
+  const notePath = note.path;
 
   Editor.setImagePasteContext(view, {
     saveImage: async (file: File) => {
@@ -700,10 +726,11 @@ function setupImagePasteContext() {
  * Must be called after loading/creating a note.
  */
 function setupAssetLoadContext() {
-  if (!currentNotebook || !currentNote) return;
+  const notebook = getNotebook(appState);
+  const note = getNote(appState);
+  if (!notebook || !note) return;
 
-  const notebook = currentNotebook;
-  const notePath = currentNote.path;
+  const notePath = note.path;
 
   setAssetLoadContext(view, {
     loadAsset: async (relativePath: string) => {
@@ -765,10 +792,10 @@ function hideReconnectDialog() {
 }
 
 async function handleReconnect() {
-  if (!pendingReconnectHandle) return;
+  if (appState.kind !== "reconnecting") return;
 
   try {
-    const notebook = await reconnectNotebook(fs, pendingReconnectHandle);
+    const notebook = await reconnectNotebook(fs, appState.handle);
     if (!notebook) {
       alert(
         "Permission denied. Please try again or open a different notebook.",
@@ -776,16 +803,21 @@ async function handleReconnect() {
       return;
     }
 
-    pendingReconnectHandle = null;
-    currentNotebook = notebook;
-
     // Load last opened note, or create a new one
     const { note, didCreate } = await loadNoteOrCreateDefault(
       fs,
       notebook,
       notebook.meta.lastOpenedNote,
     );
-    currentNote = note;
+
+    // Transition state
+    const newState = transition(appState, {
+      type: "reconnected",
+      notebook,
+      note,
+    });
+    if (!newState) return;
+    appState = newState;
 
     if (didCreate) {
       notebook.meta.lastOpenedNote = note.path;
@@ -806,7 +838,11 @@ async function handleReconnect() {
 }
 
 async function handleReconnectDifferent() {
-  pendingReconnectHandle = null;
+  // Cancel reconnect and let user choose different notebook
+  const newState = transition(appState, { type: "cancel_reconnect" });
+  if (newState) {
+    appState = newState;
+  }
   hideReconnectDialog();
   await handleOpenNotebook();
 }
@@ -825,7 +861,7 @@ const autosaveManager = new AutosaveManager({
 
 // Listen for editor changes
 Editor.onChange(view, () => {
-  if (currentNotebook && currentNote) {
+  if (canSaveNote(appState)) {
     autosaveManager.schedule();
   }
 });
@@ -904,22 +940,35 @@ async function startup() {
 
     // If permission is needed, show reconnect dialog
     if (needsPermission) {
-      pendingReconnectHandle = notebook.handle;
+      const newState = transition(appState, {
+        type: "needs_reconnect",
+        handle: notebook.handle,
+        notebookName: notebook.name,
+      });
+      if (newState) {
+        appState = newState;
+      }
       showReconnectDialog(notebook.name);
       updateTitle();
       return;
     }
 
     // Permission granted - load normally
-    currentNotebook = notebook;
-
     // Load last opened note, or create a new one
     const { note, didCreate } = await loadNoteOrCreateDefault(
       fs,
       notebook,
       notebook.meta.lastOpenedNote,
     );
-    currentNote = note;
+
+    const newState = transition(appState, {
+      type: "open_notebook",
+      notebook,
+      note,
+    });
+    if (newState) {
+      appState = newState;
+    }
 
     if (didCreate) {
       notebook.meta.lastOpenedNote = note.path;
