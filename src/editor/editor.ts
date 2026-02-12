@@ -29,6 +29,10 @@ import {
   getImageDataUrl,
 } from "./imageNodeView";
 import { categorizeImageSrc, type ImageSrcType } from "./imageUtils";
+import {
+  createLoadingPlaceholder,
+  serializePlaceholder,
+} from "./placeholderState";
 import { schema } from "./schema";
 
 // Re-export for backward compatibility
@@ -38,6 +42,37 @@ interface ImageToProcess {
   node: Node;
   src: string;
   srcType: ImageSrcType;
+}
+
+/**
+ * Replace an image's src attribute in the document.
+ * Used to update placeholders after async fetch completes.
+ * Returns true if a replacement was made.
+ */
+export function replaceImageSrc(
+  view: EditorView,
+  oldSrc: string,
+  newSrc: string,
+): boolean {
+  const { doc, tr } = view.state;
+  let updated = false;
+
+  doc.descendants((node, pos) => {
+    if (node.type.name === "image" && node.attrs.src === oldSrc) {
+      tr.setNodeMarkup(pos, null, {
+        ...node.attrs,
+        src: newSrc,
+      });
+      updated = true;
+    }
+    return !updated; // Stop traversal after first match
+  });
+
+  if (updated) {
+    view.dispatch(tr);
+  }
+
+  return updated;
 }
 
 /** Find all images in a slice that need processing (remote or data URLs) */
@@ -368,54 +403,20 @@ export function mountEditor(host: HTMLElement): EditorView {
 
           // Handle remote URLs: insert placeholder, then fetch async
           for (const img of remoteUrlImages) {
-            const placeholderId = `placeholder:loading-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-            srcMap.set(img.src, placeholderId);
+            const placeholder = createLoadingPlaceholder();
+            const placeholderSrc = serializePlaceholder(placeholder);
+            srcMap.set(img.src, placeholderSrc);
 
             // Fetch and save in background, then update document
             context
               .saveImageFromUrl(img.src)
               .then((result) => {
-                // Find and update the placeholder in the document
-                const { doc, tr } = view.state;
-                let updated = false;
-                doc.descendants((node, pos) => {
-                  if (
-                    node.type.name === "image" &&
-                    node.attrs.src === placeholderId
-                  ) {
-                    tr.setNodeMarkup(pos, null, {
-                      ...node.attrs,
-                      src: result.relativePath,
-                    });
-                    updated = true;
-                  }
-                  return !updated; // Stop if we found it
-                });
-                if (updated) {
-                  view.dispatch(tr);
-                }
+                replaceImageSrc(view, placeholderSrc, result.relativePath);
               })
               .catch((err) => {
                 console.error("Failed to fetch image:", img.src, err);
-                // Update placeholder to error state
-                const { doc, tr } = view.state;
-                let updated = false;
-                doc.descendants((node, pos) => {
-                  if (
-                    node.type.name === "image" &&
-                    node.attrs.src === placeholderId
-                  ) {
-                    tr.setNodeMarkup(pos, null, {
-                      ...node.attrs,
-                      src: "placeholder:failed",
-                    });
-                    updated = true;
-                  }
-                  return !updated;
-                });
-                if (updated) {
-                  view.dispatch(tr);
-                }
+                const failedSrc = serializePlaceholder({ status: "failed" });
+                replaceImageSrc(view, placeholderSrc, failedSrc);
               });
           }
 
@@ -426,7 +427,7 @@ export function mountEditor(host: HTMLElement): EditorView {
               srcMap.set(img.src, result.relativePath);
             } catch (err) {
               console.error("Failed to save data URL image:", err);
-              srcMap.set(img.src, "placeholder:failed");
+              srcMap.set(img.src, serializePlaceholder({ status: "failed" }));
             }
           });
 
