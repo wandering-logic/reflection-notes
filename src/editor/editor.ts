@@ -28,17 +28,11 @@ import {
   getImageBlob,
   getImageDataUrl,
 } from "./imageNodeView";
+import { categorizeImageSrc, type ImageSrcType } from "./imageUtils";
 import { schema } from "./schema";
 
-/** Categorize image src types */
-export type ImageSrcType = "remote" | "data" | "relative" | "blob";
-
-export function categorizeImageSrc(src: string): ImageSrcType {
-  if (src.startsWith("data:")) return "data";
-  if (src.startsWith("http://") || src.startsWith("https://")) return "remote";
-  if (src.startsWith("blob:")) return "blob";
-  return "relative";
-}
+// Re-export for backward compatibility
+export { categorizeImageSrc, type ImageSrcType };
 
 interface ImageToProcess {
   node: Node;
@@ -850,7 +844,7 @@ export function setupCopyHandler(view: EditorView): () => void {
       const src = selection.node.attrs.src as string;
 
       // Only handle relative paths (our locally stored images)
-      if (!isRelativePath(src)) return;
+      if (categorizeImageSrc(src) !== "relative") return;
 
       const blob = getImageBlob(view, src);
       const dataUrl = getImageDataUrl(view, src);
@@ -884,7 +878,7 @@ export function setupCopyHandler(view: EditorView): () => void {
     const processed = html.replace(
       /<img([^>]*)\ssrc=["']([^"']+)["']([^>]*)>/gi,
       (_match, before, src, after) => {
-        if (isRelativePath(src)) {
+        if (categorizeImageSrc(src) === "relative") {
           const dataUrl = getImageDataUrl(view, src);
           if (dataUrl) {
             return `<img${before} src="${dataUrl}"${after}>`;
@@ -947,15 +941,4 @@ async function convertToPng(blob: Blob): Promise<Blob> {
   } finally {
     URL.revokeObjectURL(blobUrl);
   }
-}
-
-/** Helper to check if src is a relative path */
-function isRelativePath(src: string): boolean {
-  return (
-    !src.startsWith("data:") &&
-    !src.startsWith("http:") &&
-    !src.startsWith("https:") &&
-    !src.startsWith("blob:") &&
-    !src.startsWith("placeholder:")
-  );
 }

@@ -1,5 +1,6 @@
 import type { Node } from "prosemirror-model";
 import type { EditorView } from "prosemirror-view";
+import { categorizeImageSrc } from "./imageUtils";
 
 /**
  * Context for loading assets (images, etc.) from the filesystem.
@@ -66,19 +67,6 @@ function takeBlobUrl(
     urls.delete(relativePath);
   }
   return url;
-}
-
-/**
- * Check if a src looks like a relative path (vs data: URL, external URL, or placeholder).
- */
-function isRelativePath(src: string): boolean {
-  return (
-    !src.startsWith("data:") &&
-    !src.startsWith("http:") &&
-    !src.startsWith("https:") &&
-    !src.startsWith("blob:") &&
-    !src.startsWith("placeholder:")
-  );
 }
 
 // Cache blobs for single-image copy (to write to clipboard as image data)
@@ -188,8 +176,8 @@ export function createImageNodeView(
       return;
     }
 
-    // For non-relative paths (data: URLs, external URLs), use directly
-    if (!isRelativePath(src)) {
+    // For non-relative paths (data: URLs, remote URLs, blob URLs), use directly
+    if (categorizeImageSrc(src) !== "relative") {
       dom.src = src;
       return;
     }

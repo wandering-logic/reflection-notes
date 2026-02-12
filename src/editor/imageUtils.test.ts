@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { categorizeImageSrc, type ImageSrcType } from "./editor";
+import { categorizeImageSrc, type ImageSrcType } from "./imageUtils";
 
 describe("categorizeImageSrc", () => {
   describe("data URLs", () => {
@@ -60,6 +60,20 @@ describe("categorizeImageSrc", () => {
     });
   });
 
+  describe("placeholder URLs", () => {
+    it("categorizes placeholder:loading as placeholder", () => {
+      expect(categorizeImageSrc("placeholder:loading-123")).toBe("placeholder");
+    });
+
+    it("categorizes placeholder:failed as placeholder", () => {
+      expect(categorizeImageSrc("placeholder:failed")).toBe("placeholder");
+    });
+
+    it("categorizes minimal placeholder: prefix as placeholder", () => {
+      expect(categorizeImageSrc("placeholder:")).toBe("placeholder");
+    });
+  });
+
   describe("relative paths", () => {
     it("categorizes simple filename as relative", () => {
       expect(categorizeImageSrc("image.png")).toBe("relative");
@@ -85,7 +99,7 @@ describe("categorizeImageSrc", () => {
 
     it("categorizes absolute path as relative", () => {
       // Note: /path/to/image is treated as relative by this function
-      // (not starting with http/https/data/blob)
+      // (not starting with http/https/data/blob/placeholder)
       expect(categorizeImageSrc("/path/to/image.png")).toBe("relative");
     });
 
@@ -119,7 +133,13 @@ describe("categorizeImageSrc", () => {
   describe("type safety", () => {
     it("returns a valid ImageSrcType", () => {
       const result: ImageSrcType = categorizeImageSrc("test.png");
-      const validTypes: ImageSrcType[] = ["remote", "data", "relative", "blob"];
+      const validTypes: ImageSrcType[] = [
+        "remote",
+        "data",
+        "relative",
+        "blob",
+        "placeholder",
+      ];
       expect(validTypes).toContain(result);
     });
   });
