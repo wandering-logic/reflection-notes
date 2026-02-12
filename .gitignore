@@ -22,3 +22,10 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Temp files
+del.me.*
+*.del.me.*
+clipboard-tool/
+original-*.md
+docs/testability-refactoring-guide.md
