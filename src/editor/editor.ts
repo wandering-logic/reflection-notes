@@ -286,11 +286,6 @@ export function mountEditor(host: HTMLElement): EditorView {
       image: createImageNodeView,
     },
     dispatchTransaction(tr) {
-      if (tr.getMeta("uiEvent") === "paste") {
-        console.log("Paste transaction steps:", tr.steps);
-        console.log("Doc before:", tr.before.toString());
-        console.log("Doc after:", tr.doc.toString());
-      }
       const newState = view.state.apply(tr);
       view.updateState(newState);
 
@@ -303,11 +298,6 @@ export function mountEditor(host: HTMLElement): EditorView {
         const listener = selectionListeners.get(view);
         if (listener) listener();
       }
-    },
-    transformPasted(slice) {
-      console.log("Pasted slice:", slice.content.toString());
-      console.log("Slice nodes:", slice.content);
-      return slice;
     },
     handlePaste(view, event, slice) {
       const files = event.clipboardData?.files;
