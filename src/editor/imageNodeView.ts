@@ -1,11 +1,6 @@
 import type { Node } from "prosemirror-model";
 import type { EditorView } from "prosemirror-view";
 import { categorizeImageSrc } from "./imageUtils";
-import {
-  isFailedPlaceholder,
-  isLoadingPlaceholder,
-  isPlaceholder,
-} from "./placeholderState";
 
 /**
  * Context for loading assets (images, etc.) from the filesystem.
@@ -168,12 +163,12 @@ export function createImageNodeView(
     dom.classList.remove("pm-image-loading", "pm-image-error");
 
     // Handle placeholder states (for async image fetching)
-    if (isPlaceholder(src)) {
-      if (isLoadingPlaceholder(src)) {
+    if (src.startsWith("placeholder:")) {
+      if (src.startsWith("placeholder:loading")) {
         dom.classList.add("pm-image-loading");
         dom.src = "";
         dom.alt = "Loading image...";
-      } else if (isFailedPlaceholder(src)) {
+      } else if (src === "placeholder:failed") {
         dom.classList.add("pm-image-error");
         dom.src = "";
         dom.alt = "Failed to load image";

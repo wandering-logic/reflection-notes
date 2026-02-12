@@ -29,10 +29,6 @@ import {
   getImageDataUrl,
 } from "./imageNodeView";
 import { categorizeImageSrc, type ImageSrcType } from "./imageUtils";
-import {
-  createLoadingPlaceholder,
-  serializePlaceholder,
-} from "./placeholderState";
 import { schema } from "./schema";
 
 // Re-export for backward compatibility
@@ -403,8 +399,7 @@ export function mountEditor(host: HTMLElement): EditorView {
 
           // Handle remote URLs: insert placeholder, then fetch async
           for (const img of remoteUrlImages) {
-            const placeholder = createLoadingPlaceholder();
-            const placeholderSrc = serializePlaceholder(placeholder);
+            const placeholderSrc = `placeholder:loading-${Date.now()}-${Math.random().toString(36).slice(2)}`;
             srcMap.set(img.src, placeholderSrc);
 
             // Fetch and save in background, then update document
@@ -415,8 +410,7 @@ export function mountEditor(host: HTMLElement): EditorView {
               })
               .catch((err) => {
                 console.error("Failed to fetch image:", img.src, err);
-                const failedSrc = serializePlaceholder({ status: "failed" });
-                replaceImageSrc(view, placeholderSrc, failedSrc);
+                replaceImageSrc(view, placeholderSrc, "placeholder:failed");
               });
           }
 
@@ -427,7 +421,7 @@ export function mountEditor(host: HTMLElement): EditorView {
               srcMap.set(img.src, result.relativePath);
             } catch (err) {
               console.error("Failed to save data URL image:", err);
-              srcMap.set(img.src, serializePlaceholder({ status: "failed" }));
+              srcMap.set(img.src, "placeholder:failed");
             }
           });
 
