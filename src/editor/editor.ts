@@ -860,6 +860,7 @@ export function setupCopyHandler(view: EditorView): () => void {
           await navigator.clipboard.write([clipboardItem]);
         } catch (err) {
           console.error("Failed to write image to clipboard:", err);
+          alert("Failed to copy image to clipboard.");
         }
       }
       return;
