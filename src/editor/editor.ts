@@ -13,6 +13,7 @@ import {
   splitListItem,
   wrapInList,
 } from "prosemirror-schema-list";
+import { tableEditing } from "prosemirror-tables";
 import {
   EditorState,
   NodeSelection,
@@ -26,6 +27,7 @@ import { getImageManager } from "./ImageManager";
 import { createImageNodeView } from "./imageNodeView";
 import { categorizeImageSrc, type ImageSrcType } from "./imageUtils";
 import { schema } from "./schema";
+import { normalizeTablesInSlice } from "./tableNormalize";
 
 // Re-export for backward compatibility
 export { categorizeImageSrc, type ImageSrcType };
@@ -232,6 +234,7 @@ const placeholderPlugin = new Plugin({
 const plugins = [
   history(),
   markKeymap,
+  tableEditing(), // Table editing (Tab navigation, row length fixes) - before listKeymap
   listKeymap,
   navigationKeymap,
   placeholderPlugin,
@@ -362,6 +365,10 @@ export function mountEditor(host: HTMLElement): EditorView {
           return true; // Consume the paste event
         }
       }
+
+      // Normalize tables in pasted content to enforce GFM semantics
+      // (flatten spanning cells, ensure first row is header cells)
+      slice = normalizeTablesInSlice(slice, schema);
 
       // Check for images in HTML content that need processing
       const imagesToProcess = findImagesToProcess(slice);

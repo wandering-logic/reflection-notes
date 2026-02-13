@@ -1,6 +1,17 @@
 import { Schema } from "prosemirror-model";
 import { marks, nodes } from "prosemirror-schema-basic";
 import { bulletList, listItem, orderedList } from "prosemirror-schema-list";
+import { tableNodes } from "prosemirror-tables";
+
+// Generate table node specs from prosemirror-tables
+// TODO: GFM has per-column alignment (left/center/right/none).
+// Add `alignments: Alignment[]` attr to table node when we implement alignment UI.
+// For now, all cells render left-aligned.
+const tableNodeSpecs = tableNodes({
+  tableGroup: "block",
+  cellContent: "inline*", // GFM: cells contain inline content only
+  cellAttributes: {},
+});
 
 export function formatTimestamp(ts: number): string {
   const date = new Date(ts);
@@ -101,6 +112,11 @@ export const schema = new Schema({
       ...listItem,
       content: "block+",
     },
+    // Table nodes from prosemirror-tables
+    table: tableNodeSpecs.table,
+    table_row: tableNodeSpecs.table_row,
+    table_cell: tableNodeSpecs.table_cell,
+    table_header: tableNodeSpecs.table_header,
     // text is both "inline" and "text_content" (title allows text_content only)
     text: {
       ...nodes.text,
