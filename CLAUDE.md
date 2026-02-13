@@ -16,9 +16,9 @@ npm run test:watch # Run tests in watch mode
 
 **When to run tests:** Run `npm test` after modifying any functions in `src/storage/` or `src/editor/`. Tests cover pure functions like `extractTitle`, `parseDataUrl`, `categorizeImageSrc`, etc. The test suite runs in ~200ms.
 
-## Project Vision
+## Project Vision and Objectives
 
-A PWA semantic notebook editor (like OneNote but with better math support, open file format, and clean HTML export). See README.md for details.
+Read README.md 
 
 **File format**: Each note is a directory containing `note.json` (ProseMirror JSON) + assets. Notebooks are directories with `notebook.json` metadata. See Storage Architecture below.
 
