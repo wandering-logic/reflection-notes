@@ -784,7 +784,11 @@ export function setupCopyHandler(view: EditorView): () => void {
       selection instanceof NodeSelection &&
       selection.node.type.name === "image"
     ) {
-      const src = selection.node.attrs.src as string;
+      const { src, alt, title } = selection.node.attrs as {
+        src: string;
+        alt: string | null;
+        title: string | null;
+      };
 
       // Only handle relative paths (our locally stored images)
       if (categorizeImageSrc(src) !== "relative") return;
@@ -801,11 +805,17 @@ export function setupCopyHandler(view: EditorView): () => void {
           convertToPng(blob),
         ]);
 
+        // Build img tag with all attributes (escape for HTML attributes)
+        const escapeAttr = (s: string) =>
+          s.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+        let imgHtml = `<img src="${dataUrl}"`;
+        if (alt) imgHtml += ` alt="${escapeAttr(alt)}"`;
+        if (title) imgHtml += ` title="${escapeAttr(title)}"`;
+        imgHtml += ">";
+
         const clipboardItem = new ClipboardItem({
           "image/png": pngBlob,
-          "text/html": new Blob([`<img src="${dataUrl}">`], {
-            type: "text/html",
-          }),
+          "text/html": new Blob([imgHtml], { type: "text/html" }),
         });
         await navigator.clipboard.write([clipboardItem]);
       } catch (err) {
