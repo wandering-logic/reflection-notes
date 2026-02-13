@@ -831,39 +831,48 @@ export function setupCopyHandler(view: EditorView): () => void {
 
     if (relativePaths.length === 0) return;
 
-    // Fetch all data URLs in parallel
-    const dataUrlMap = new Map<string, string>();
-    await Promise.all(
-      relativePaths.map(async (src) => {
-        try {
-          const dataUrl = await manager.getDataUrl(src);
-          dataUrlMap.set(src, dataUrl);
-        } catch (err) {
-          console.error("Failed to get data URL for:", src, err);
-        }
-      }),
-    );
+    // IMPORTANT: Clipboard events are synchronous - we must preventDefault and
+    // capture all data BEFORE any async work. Then use navigator.clipboard.write().
+    event.preventDefault();
+    const plainText = event.clipboardData?.getData("text/plain") || "";
 
-    // Replace relative paths with data URLs
-    const processed = html.replace(
-      /<img([^>]*)\ssrc=["']([^"']+)["']([^>]*)>/gi,
-      (_match, before, src, after) => {
-        const dataUrl = dataUrlMap.get(src);
-        if (dataUrl) {
-          return `<img${before} src="${dataUrl}"${after}>`;
-        }
-        return _match;
-      },
-    );
+    try {
+      // Fetch all data URLs in parallel
+      const dataUrlMap = new Map<string, string>();
+      await Promise.all(
+        relativePaths.map(async (src) => {
+          try {
+            const dataUrl = await manager.getDataUrl(src);
+            dataUrlMap.set(src, dataUrl);
+          } catch (err) {
+            console.error("Failed to get data URL for:", src, err);
+          }
+        }),
+      );
 
-    if (processed !== html) {
-      event.preventDefault();
-      event.clipboardData?.setData("text/html", processed);
-      // Preserve plain text
-      const text = event.clipboardData?.getData("text/plain") || "";
-      if (text) {
-        event.clipboardData?.setData("text/plain", text);
+      // Replace relative paths with data URLs
+      const processed = html.replace(
+        /<img([^>]*)\ssrc=["']([^"']+)["']([^>]*)>/gi,
+        (_match, before, src, after) => {
+          const dataUrl = dataUrlMap.get(src);
+          if (dataUrl) {
+            return `<img${before} src="${dataUrl}"${after}>`;
+          }
+          return _match;
+        },
+      );
+
+      // Write to clipboard using async API
+      const items: Record<string, Blob> = {
+        "text/html": new Blob([processed], { type: "text/html" }),
+      };
+      if (plainText) {
+        items["text/plain"] = new Blob([plainText], { type: "text/plain" });
       }
+      await navigator.clipboard.write([new ClipboardItem(items)]);
+    } catch (err) {
+      console.error("Failed to write to clipboard:", err);
+      alert("Failed to copy to clipboard.");
     }
   };
 
