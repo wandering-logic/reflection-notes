@@ -1,25 +1,27 @@
 # [Reflection Notes](https://reflection-notes.wanderinglogic.com/) - a Semantic Notebook webapp
 
-The app is served through github pages at https://reflection-notes.wanderinglogic.com/.
-Please try it out and let me know what you think!
+A WYSIWYG editor for people who think in Markdown but would prefer less friction for images, links, math and tables.
 
-This will hopefully eventually be a full progressive web app that supports
-editing rich text documents with semantic structure (paragraphs, headings,
-quotes, code, lists, strong, emph, links, images, strikethrough) plus math
-(with KaTex) and tables (maybe eventually footnotes.
+The app is served at https://reflection-notes.wanderinglogic.com/, and would
+not be possible without the excellent [ProseMirror
+toolkit](https://prosemirror.net/).
 
-The motivation is that I want something that is similarly functional to the
-OneNote PWA, but with better math support, an open file format, and excellent
-export of static html (for publication on (for example) a blog).
+## Guiding Principles
 
-The [ProseMirror toolkit](https://prosemirror.net/) is doing almost all the
-heavy lifting here.  It's truly a wonderful library.
+These principles guide design decisions:
 
-The file format will is: each note is a subdirectory containing a ProseMirror
-json and additional assets (images).  A "notebook" will simply be a directory
-hierarchy of notes (with some top level indices eventually and some shared
-assets (like user-provided style sheets).
+1. **Keyboard-first** — Like vim or emacs, hands stay on the keyboard as much as possible.
 
-Near term I'll support syncing to local file system.  Longer term the plan is
-to sync to DropBox or Box or OneDrive or Google Drive (or Github?) for mobile
-support.
+2. **Markdown-compatible** — The schema stays grammatically similar to GitHub Flavored Markdown. No features that can't round-trip through GFM. Import and export without information loss.
+
+3. **Offline-first** — Works without a network connection. Cloud sync is for convenience, not dependency.
+
+4. **Open format** — File format is documented and human-readable. No proprietary lock-in.
+
+5. **Portable** — Runs anywhere with a modern browser (PWA). Data can move between platforms.
+
+6. **Scratching my own itch** — Built for my personal workflow.  I hope others like it.
+
+## File Format
+
+Each note is a subdirectory containing ProseMirror JSON plus assets (images). A notebook is a directory hierarchy of notes with top-level metadata.
