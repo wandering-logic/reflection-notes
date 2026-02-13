@@ -22,12 +22,8 @@ import {
 } from "prosemirror-state";
 import { Decoration, DecorationSet, EditorView } from "prosemirror-view";
 import { isAllowedImageType } from "../storage/image";
-import {
-  addImageBlobUrl,
-  createImageNodeView,
-  getImageBlob,
-  getImageDataUrl,
-} from "./imageNodeView";
+import { getImageManager } from "./ImageManager";
+import { createImageNodeView } from "./imageNodeView";
 import { categorizeImageSrc, type ImageSrcType } from "./imageUtils";
 import { schema } from "./schema";
 
@@ -248,27 +244,54 @@ const changeListeners = new WeakMap<EditorView, () => void>();
 // Selection change listeners per view
 const selectionListeners = new WeakMap<EditorView, () => void>();
 
-// Image paste context per view
-export interface ImagePasteContext {
-  /** Save image file and return its relative path */
-  saveImage: (file: File) => Promise<{ relativePath: string }>;
-  /** Fetch image from URL, save it, and return its relative path */
-  saveImageFromUrl: (url: string) => Promise<{ relativePath: string }>;
-  /** Decode data URL, save the image, and return its relative path */
-  saveImageFromDataUrl: (dataUrl: string) => Promise<{ relativePath: string }>;
-}
-
-const imagePasteContexts = new WeakMap<EditorView, ImagePasteContext>();
-
 /**
- * Set the image paste context for a view.
- * Called from main.ts when a note is loaded/created.
+ * Insert a slice into the document, handling block vs inline content.
+ * Used after transforming images in pasted HTML.
  */
-export function setImagePasteContext(
-  view: EditorView,
-  context: ImagePasteContext,
-): void {
-  imagePasteContexts.set(view, context);
+function insertSlice(view: EditorView, slice: Slice): void {
+  const { state } = view;
+
+  // Check if slice contains block-level nodes
+  let hasBlockContent = false;
+  slice.content.forEach((node) => {
+    if (node.isBlock) hasBlockContent = true;
+  });
+
+  if (!hasBlockContent) {
+    // Just insert inline content
+    const tr = state.tr;
+    tr.replaceSelection(slice);
+    view.dispatch(tr);
+    return;
+  }
+
+  // Transform title nodes to section level 1 for body paste
+  const transformedNodes: Node[] = [];
+  slice.content.forEach((node) => {
+    if (node.type.name === "title") {
+      transformedNodes.push(
+        schema.nodes.section.create({ level: 1 }, node.content),
+      );
+    } else {
+      transformedNodes.push(node);
+    }
+  });
+
+  const tr = state.tr;
+  const { $from } = state.selection;
+  const currentBlock = $from.node(1);
+  const beforeBlock = $from.before(1);
+  const afterBlock = $from.after(1);
+
+  if (currentBlock.content.size === 0) {
+    tr.replaceWith(beforeBlock, afterBlock, transformedNodes);
+  } else {
+    tr.insert(afterBlock, transformedNodes);
+  }
+
+  const insertEnd = tr.mapping.map(afterBlock);
+  tr.setSelection(Selection.near(tr.doc.resolve(insertEnd)));
+  view.dispatch(tr);
 }
 
 export function mountEditor(host: HTMLElement): EditorView {
@@ -300,6 +323,7 @@ export function mountEditor(host: HTMLElement): EditorView {
       }
     },
     handlePaste(view, event, slice) {
+      const manager = getImageManager(view);
       const files = event.clipboardData?.files;
 
       // Check for image files first
@@ -313,29 +337,15 @@ export function mountEditor(host: HTMLElement): EditorView {
         }
 
         if (imageFiles.length > 0) {
-          const context = imagePasteContexts.get(view);
-          if (!context) {
-            console.warn("No image paste context available");
+          if (!manager) {
+            console.warn("No ImageManager available");
             return false;
-          }
-
-          const { state } = view;
-          const { $from } = state.selection;
-          const docIndex = $from.index(0);
-
-          // Don't allow images in title (index 0) or created (index 1)
-          if (docIndex < 2) {
-            return true; // Consume event but do nothing
           }
 
           // Process images asynchronously
           Promise.all(
             imageFiles.map(async (file) => {
-              const result = await context.saveImage(file);
-              // Create blob URL for immediate display
-              const blobUrl = URL.createObjectURL(file);
-              // Pass original file for copy cache
-              addImageBlobUrl(view, result.relativePath, blobUrl, file);
+              const result = await manager.ingest({ type: "file", file });
               return schema.nodes.image.create({
                 src: result.relativePath,
                 alt: file.name,
@@ -353,117 +363,62 @@ export function mountEditor(host: HTMLElement): EditorView {
         }
       }
 
-      // Check for images in HTML content that need processing (remote URLs, data URLs)
+      // Check for images in HTML content that need processing
       const imagesToProcess = findImagesToProcess(slice);
-      if (imagesToProcess.length > 0) {
-        const context = imagePasteContexts.get(view);
-        if (!context) {
-          console.warn("No image paste context available");
-          return false;
+      if (imagesToProcess.length > 0 && manager) {
+        // Separate by type: data URLs (fast) vs remote/blob URLs (slow)
+        const fastImages = imagesToProcess.filter(
+          (img) => img.srcType === "data",
+        );
+        const slowImages = imagesToProcess.filter(
+          (img) => img.srcType === "remote" || img.srcType === "blob",
+        );
+
+        const srcMap = new Map<string, string>();
+
+        // Handle slow images: insert placeholder, fetch in background
+        for (const img of slowImages) {
+          const placeholderSrc = `placeholder:loading-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+          srcMap.set(img.src, placeholderSrc);
+
+          // Determine source type for ImageManager
+          const source =
+            img.srcType === "blob"
+              ? { type: "remoteUrl" as const, url: img.src } // Blob URLs can be fetched
+              : { type: "remoteUrl" as const, url: img.src };
+
+          manager
+            .ingest(source)
+            .then((result) => {
+              replaceImageSrc(view, placeholderSrc, result.relativePath);
+            })
+            .catch((err) => {
+              console.error("Failed to fetch image:", img.src, err);
+              replaceImageSrc(view, placeholderSrc, "placeholder:failed");
+            });
         }
 
-        const { state } = view;
-        const { $from } = state.selection;
-        const docIndex = $from.index(0);
-
-        // Don't allow images in title or created
-        if (docIndex < 2) {
-          // Filter out images from slice
-          const srcMap = new Map<string, string>();
-          for (const img of imagesToProcess) {
-            srcMap.set(img.src, ""); // Empty string will be filtered out
-          }
-          slice = transformSliceImages(slice, srcMap);
-          // Continue with normal paste handling below
-        } else {
-          // Separate data URLs (can process immediately) from remote URLs (need async fetch)
-          const dataUrlImages = imagesToProcess.filter(
-            (img) => img.srcType === "data",
-          );
-          const remoteUrlImages = imagesToProcess.filter(
-            (img) => img.srcType === "remote",
-          );
-
-          // Process all images and build src mapping
-          const srcMap = new Map<string, string>();
-
-          // Handle remote URLs: insert placeholder, then fetch async
-          for (const img of remoteUrlImages) {
-            const placeholderSrc = `placeholder:loading-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-            srcMap.set(img.src, placeholderSrc);
-
-            // Fetch and save in background, then update document
-            context
-              .saveImageFromUrl(img.src)
-              .then((result) => {
-                replaceImageSrc(view, placeholderSrc, result.relativePath);
-              })
-              .catch((err) => {
-                console.error("Failed to fetch image:", img.src, err);
-                replaceImageSrc(view, placeholderSrc, "placeholder:failed");
-              });
-          }
-
-          // Handle data URLs: decode and save immediately
-          const dataUrlPromises = dataUrlImages.map(async (img) => {
-            try {
-              const result = await context.saveImageFromDataUrl(img.src);
-              srcMap.set(img.src, result.relativePath);
-            } catch (err) {
-              console.error("Failed to save data URL image:", err);
-              srcMap.set(img.src, "placeholder:failed");
-            }
-          });
-
-          // Wait for data URLs to be processed, then continue with paste
-          Promise.all(dataUrlPromises).then(() => {
-            const transformedSlice = transformSliceImages(slice, srcMap);
-
-            // Now do the normal paste handling with transformed slice
-            let hasBlockContent = false;
-            transformedSlice.content.forEach((node) => {
-              if (node.isBlock) hasBlockContent = true;
+        // Handle fast images: process immediately
+        const fastPromises = fastImages.map(async (img) => {
+          try {
+            const result = await manager.ingest({
+              type: "dataUrl",
+              dataUrl: img.src,
             });
+            srcMap.set(img.src, result.relativePath);
+          } catch (err) {
+            console.error("Failed to save data URL image:", err);
+            srcMap.set(img.src, "placeholder:failed");
+          }
+        });
 
-            if (!hasBlockContent) {
-              // Just insert inline content
-              const tr = view.state.tr;
-              tr.replaceSelection(transformedSlice);
-              view.dispatch(tr);
-              return;
-            }
+        // Wait for fast images, then insert transformed slice
+        Promise.all(fastPromises).then(() => {
+          const transformedSlice = transformSliceImages(slice, srcMap);
+          insertSlice(view, transformedSlice);
+        });
 
-            // Handle body paste
-            const transformedNodes: Node[] = [];
-            transformedSlice.content.forEach((node) => {
-              if (node.type.name === "title") {
-                transformedNodes.push(
-                  schema.nodes.section.create({ level: 1 }, node.content),
-                );
-              } else {
-                transformedNodes.push(node);
-              }
-            });
-
-            const tr = view.state.tr;
-            const $from = view.state.selection.$from;
-            const currentBlock = $from.node(1);
-            const beforeBlock = $from.before(1);
-            const afterBlock = $from.after(1);
-
-            if (currentBlock.content.size === 0) {
-              tr.replaceWith(beforeBlock, afterBlock, transformedNodes);
-            } else {
-              tr.insert(afterBlock, transformedNodes);
-            }
-
-            const insertEnd = tr.mapping.map(afterBlock);
-            tr.setSelection(Selection.near(tr.doc.resolve(insertEnd)));
-            view.dispatch(tr);
-          });
-
-          return true; // Consume the paste event
-        }
+        return true; // Consume the paste event
       }
 
       // Check if slice contains block-level nodes
@@ -819,6 +774,9 @@ export function setupCopyHandler(view: EditorView): () => void {
   const handler = async (event: ClipboardEvent) => {
     if (!view.hasFocus()) return;
 
+    const manager = getImageManager(view);
+    if (!manager) return;
+
     const { selection } = view.state;
 
     // Case A: Single image selected (NodeSelection)
@@ -831,27 +789,28 @@ export function setupCopyHandler(view: EditorView): () => void {
       // Only handle relative paths (our locally stored images)
       if (categorizeImageSrc(src) !== "relative") return;
 
-      const blob = getImageBlob(view, src);
-      const dataUrl = getImageDataUrl(view, src);
+      const blob = manager.getBlob(src);
+      if (!blob) return;
 
-      if (blob && dataUrl) {
-        event.preventDefault();
+      event.preventDefault();
 
-        try {
-          // Clipboard API only supports image/png, so convert if needed
-          const pngBlob = await convertToPng(blob);
+      try {
+        // Get data URL and convert blob to PNG for clipboard
+        const [dataUrl, pngBlob] = await Promise.all([
+          manager.getDataUrl(src),
+          convertToPng(blob),
+        ]);
 
-          const clipboardItem = new ClipboardItem({
-            "image/png": pngBlob,
-            "text/html": new Blob([`<img src="${dataUrl}">`], {
-              type: "text/html",
-            }),
-          });
-          await navigator.clipboard.write([clipboardItem]);
-        } catch (err) {
-          console.error("Failed to write image to clipboard:", err);
-          alert("Failed to copy image to clipboard.");
-        }
+        const clipboardItem = new ClipboardItem({
+          "image/png": pngBlob,
+          "text/html": new Blob([`<img src="${dataUrl}">`], {
+            type: "text/html",
+          }),
+        });
+        await navigator.clipboard.write([clipboardItem]);
+      } catch (err) {
+        console.error("Failed to write image to clipboard:", err);
+        alert("Failed to copy image to clipboard.");
       }
       return;
     }
@@ -860,15 +819,38 @@ export function setupCopyHandler(view: EditorView): () => void {
     const html = event.clipboardData?.getData("text/html");
     if (!html || !html.includes("<img")) return;
 
-    // Find all relative image paths and replace with data URLs
+    // Find all relative image paths in the HTML
+    const imgRegex = /<img([^>]*)\ssrc=["']([^"']+)["']([^>]*)>/gi;
+    const relativePaths: string[] = [];
+    for (const match of html.matchAll(imgRegex)) {
+      const src = match[2];
+      if (categorizeImageSrc(src) === "relative") {
+        relativePaths.push(src);
+      }
+    }
+
+    if (relativePaths.length === 0) return;
+
+    // Fetch all data URLs in parallel
+    const dataUrlMap = new Map<string, string>();
+    await Promise.all(
+      relativePaths.map(async (src) => {
+        try {
+          const dataUrl = await manager.getDataUrl(src);
+          dataUrlMap.set(src, dataUrl);
+        } catch (err) {
+          console.error("Failed to get data URL for:", src, err);
+        }
+      }),
+    );
+
+    // Replace relative paths with data URLs
     const processed = html.replace(
       /<img([^>]*)\ssrc=["']([^"']+)["']([^>]*)>/gi,
       (_match, before, src, after) => {
-        if (categorizeImageSrc(src) === "relative") {
-          const dataUrl = getImageDataUrl(view, src);
-          if (dataUrl) {
-            return `<img${before} src="${dataUrl}"${after}>`;
-          }
+        const dataUrl = dataUrlMap.get(src);
+        if (dataUrl) {
+          return `<img${before} src="${dataUrl}"${after}>`;
         }
         return _match;
       },

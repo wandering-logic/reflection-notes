@@ -10,7 +10,12 @@
  */
 
 /** Categorize image src types */
-export type ImageSrcType = "remote" | "data" | "relative" | "blob" | "placeholder";
+export type ImageSrcType =
+  | "remote"
+  | "data"
+  | "relative"
+  | "blob"
+  | "placeholder";
 
 /**
  * Categorize an image src by its URL scheme.

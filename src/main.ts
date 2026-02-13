@@ -2,25 +2,18 @@ import "./style.css";
 import "prosemirror-view/style/prosemirror.css";
 import { registerSW } from "virtual:pwa-register";
 import {
+  type AppState,
   canSaveNote,
   getDocumentTitle,
   getNote,
   getNotebook,
   initialState,
   transition,
-  type AppState,
 } from "./appState";
 import { AutosaveManager } from "./autosave";
 import * as Editor from "./editor/editor";
-import { addImageBlobUrl, setAssetLoadContext } from "./editor/imageNodeView";
+import { ImageManager, setImageManager } from "./editor/ImageManager";
 import { LocalFileSystemProvider } from "./storage/filesystem";
-import {
-  getMimeTypeFromExtension,
-  isAllowedImageType,
-  parseDataUrl,
-  saveImage,
-  saveImageFromBlob,
-} from "./storage/image";
 
 // Register service worker and handle updates
 const updateSW = registerSW({
@@ -485,9 +478,8 @@ async function handleNewNote() {
   await saveNotebookMeta(fs, notebook);
 
   // Load into editor
-  setupAssetLoadContext();
+  setupImageManager();
   Editor.setContent(view, note.content);
-  setupImagePasteContext();
   updateTitle();
   view.focus();
 }
@@ -548,9 +540,8 @@ async function handleOpenNote() {
   await saveNotebookMeta(fs, notebook);
 
   // Load into editor
-  setupAssetLoadContext();
+  setupImageManager();
   Editor.setContent(view, note.content);
-  setupImagePasteContext();
   updateTitle();
   view.focus();
 }
@@ -571,9 +562,8 @@ async function handleNewNotebook() {
     if (!newState) return;
     appState = newState;
 
-    setupAssetLoadContext();
+    setupImageManager();
     Editor.setContent(view, note.content);
-    setupImagePasteContext();
     updateTitle();
     hideWelcomeDialog();
     view.focus();
@@ -612,9 +602,8 @@ async function handleOpenNotebook() {
       await saveNotebookMeta(fs, notebook);
     }
 
-    setupAssetLoadContext();
+    setupImageManager();
     Editor.setContent(view, note.content);
-    setupImagePasteContext();
     updateTitle();
     hideWelcomeDialog();
     view.focus();
@@ -635,113 +624,27 @@ async function saveCurrentNote() {
   await saveNote(fs, notebook, note);
 }
 
+// Current ImageManager for the loaded note
+let imageManager: ImageManager | null = null;
+
 /**
- * Set up image paste context for the current note.
+ * Set up ImageManager for the current note.
+ * Disposes the previous ImageManager if one exists.
  * Must be called after loading/creating a note.
  */
-function setupImagePasteContext() {
+function setupImageManager() {
   const notebook = getNotebook(appState);
   const note = getNote(appState);
   if (!notebook || !note) return;
 
-  const notePath = note.path;
+  // Dispose previous ImageManager
+  if (imageManager) {
+    imageManager.dispose();
+  }
 
-  Editor.setImagePasteContext(view, {
-    saveImage: async (file: File) => {
-      const result = await saveImage(fs, notebook, notePath, file);
-      // Create blob URL for immediate display
-      const blobUrl = URL.createObjectURL(file);
-      addImageBlobUrl(view, result.relativePath, blobUrl, file);
-      return result;
-    },
-
-    saveImageFromUrl: async (url: string) => {
-      // Fetch the image from the URL
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch image: ${response.status}`);
-      }
-
-      const blob = await response.blob();
-
-      // Check if the MIME type is allowed
-      if (!isAllowedImageType(blob.type)) {
-        throw new Error(`Unsupported image type: ${blob.type}`);
-      }
-
-      // Extract a suggested name from the URL
-      const urlPath = new URL(url).pathname;
-      const suggestedName = urlPath.split("/").pop() || "image";
-
-      const result = await saveImageFromBlob(
-        fs,
-        notebook,
-        notePath,
-        blob,
-        suggestedName,
-      );
-
-      // Create blob URL for immediate display
-      const blobUrl = URL.createObjectURL(blob);
-      addImageBlobUrl(view, result.relativePath, blobUrl, blob);
-
-      return result;
-    },
-
-    saveImageFromDataUrl: async (dataUrl: string) => {
-      // Parse the data URL
-      const parsed = parseDataUrl(dataUrl);
-      if (!parsed) {
-        throw new Error("Invalid data URL");
-      }
-
-      // Check if the MIME type is allowed
-      if (!isAllowedImageType(parsed.mimeType)) {
-        throw new Error(`Unsupported image type: ${parsed.mimeType}`);
-      }
-
-      // Create a blob from the parsed data
-      const blob = new Blob([parsed.data], { type: parsed.mimeType });
-
-      const result = await saveImageFromBlob(
-        fs,
-        notebook,
-        notePath,
-        blob,
-        "image",
-      );
-
-      // Create blob URL for immediate display
-      const blobUrl = URL.createObjectURL(blob);
-      addImageBlobUrl(view, result.relativePath, blobUrl, blob);
-
-      return result;
-    },
-  });
-}
-
-/**
- * Set up asset load context for the current note.
- * Allows NodeViews to load assets (images) on demand.
- * Must be called after loading/creating a note.
- */
-function setupAssetLoadContext() {
-  const notebook = getNotebook(appState);
-  const note = getNote(appState);
-  if (!notebook || !note) return;
-
-  const notePath = note.path;
-
-  setAssetLoadContext(view, {
-    loadAsset: async (relativePath: string) => {
-      const data = await fs.readBinaryFile(
-        notebook.handle,
-        `${notePath}/${relativePath}`,
-      );
-      const mimeType = getMimeTypeFromExtension(relativePath);
-      return new Blob([data], mimeType ? { type: mimeType } : undefined);
-    },
-  });
+  // Create new ImageManager for this note
+  imageManager = new ImageManager(fs, notebook, note.path);
+  setImageManager(view, imageManager);
 }
 
 document
@@ -824,9 +727,8 @@ async function handleReconnect() {
       await saveNotebookMeta(fs, notebook);
     }
 
-    setupAssetLoadContext();
+    setupImageManager();
     Editor.setContent(view, note.content);
-    setupImagePasteContext();
     updateTitle();
     hideReconnectDialog();
     view.focus();
@@ -975,9 +877,8 @@ async function startup() {
       await saveNotebookMeta(fs, notebook);
     }
 
-    setupAssetLoadContext();
+    setupImageManager();
     Editor.setContent(view, note.content);
-    setupImagePasteContext();
     updateTitle();
     view.focus();
     return;

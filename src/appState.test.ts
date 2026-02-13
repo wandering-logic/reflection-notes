@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  type AppState,
   canCreateNote,
   canOpenNote,
   canSaveNote,
@@ -8,7 +9,6 @@ import {
   getNotebook,
   initialState,
   transition,
-  type AppState,
 } from "./appState";
 import type { Note } from "./storage/note";
 import type { Notebook } from "./storage/notebook";

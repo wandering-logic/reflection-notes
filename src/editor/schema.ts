@@ -21,7 +21,8 @@ export const schema = new Schema({
       content: "title created block+",
     },
     title: {
-      content: "inline*",
+      // text_content excludes images (image is "inline" but not "text_content")
+      content: "text_content*",
       parseDOM: [{ tag: "h1" }],
       toDOM() {
         return ["h1", 0];
@@ -100,7 +101,11 @@ export const schema = new Schema({
       ...listItem,
       content: "block+",
     },
-    text: nodes.text,
+    // text is both "inline" and "text_content" (title allows text_content only)
+    text: {
+      ...nodes.text,
+      group: "inline text_content",
+    },
     image: {
       inline: true,
       atom: true,
