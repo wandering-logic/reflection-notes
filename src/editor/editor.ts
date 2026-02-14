@@ -26,6 +26,7 @@ import { isAllowedImageType } from "../storage/image";
 import { getImageManager } from "./ImageManager";
 import { createImageNodeView } from "./imageNodeView";
 import { categorizeImageSrc, type ImageSrcType } from "./imageUtils";
+import { createMathDisplayNodeView } from "./mathNodeView";
 import { schema } from "./schema";
 import { normalizeTablesInSlice } from "./tableNormalize";
 
@@ -310,6 +311,7 @@ export function mountEditor(host: HTMLElement): EditorView {
     state,
     nodeViews: {
       image: createImageNodeView,
+      math_display: createMathDisplayNodeView,
     },
     dispatchTransaction(tr) {
       const newState = view.state.apply(tr);
@@ -606,6 +608,17 @@ export function insertHorizontalRule(view: EditorView): boolean {
   const { state, dispatch } = view;
   const hr = schema.nodes.horizontal_rule.create();
   dispatch(state.tr.replaceSelectionWith(hr));
+  return true;
+}
+
+export function insertMathDisplay(view: EditorView): boolean {
+  const { state, dispatch } = view;
+  const mathNode = schema.nodes.math_display.create({ content: "" });
+  const tr = state.tr.replaceSelectionWith(mathNode);
+  // Select the new math node so the popover opens
+  const pos = tr.selection.from - 1;
+  tr.setSelection(NodeSelection.create(tr.doc, pos));
+  dispatch(tr);
   return true;
 }
 

@@ -30,6 +30,7 @@ Label          <- Text
 Block          <- LeafBlock | ContainerBlock
 
 LeafBlock      <- Paragraph | Section | CodeBlock | MathDisplay | HorizontalRule | Table
+
 ContainerBlock <- Blockquote | List
 
 Paragraph      <- Inline*

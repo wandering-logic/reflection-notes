@@ -98,6 +98,33 @@ export const schema = new Schema({
       ...nodes.horizontal_rule,
       group: "block",
     },
+    math_display: {
+      atom: true,
+      attrs: {
+        content: { default: "", validate: "string" },
+      },
+      group: "block",
+      selectable: true,
+      draggable: true,
+      parseDOM: [
+        {
+          tag: "div.math-display",
+          getAttrs(dom) {
+            const el = dom as HTMLElement;
+            return { content: el.getAttribute("data-latex") || "" };
+          },
+        },
+      ],
+      toDOM(node) {
+        return [
+          "div",
+          {
+            class: "math-display",
+            "data-latex": node.attrs.content,
+          },
+        ];
+      },
+    },
     bullet_list: {
       ...bulletList,
       content: "list_item+",
