@@ -13,7 +13,6 @@ import {
   splitListItem,
   wrapInList,
 } from "prosemirror-schema-list";
-import { tableEditing } from "prosemirror-tables";
 import {
   EditorState,
   NodeSelection,
@@ -21,6 +20,7 @@ import {
   Selection,
   type Transaction,
 } from "prosemirror-state";
+import { tableEditing } from "prosemirror-tables";
 import { Decoration, DecorationSet, EditorView } from "prosemirror-view";
 import { isAllowedImageType } from "../storage/image";
 import { getImageManager } from "./ImageManager";

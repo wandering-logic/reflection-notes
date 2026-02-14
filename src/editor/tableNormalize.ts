@@ -1,4 +1,4 @@
-import { Fragment, Node, Slice, type Schema } from "prosemirror-model";
+import { Fragment, type Node, type Schema, Slice } from "prosemirror-model";
 
 /**
  * Normalize a table node to enforce GFM table semantics:
@@ -67,7 +67,6 @@ export function normalizeTableNode(table: Node, schema: Schema): Node {
  * Transform a slice by normalizing all tables within it.
  */
 export function normalizeTablesInSlice(slice: Slice, schema: Schema): Slice {
-
   function transformFragment(fragment: Fragment): Fragment {
     const nodes: Node[] = [];
     fragment.forEach((node) => {

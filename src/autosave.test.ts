@@ -70,7 +70,7 @@ describe("AutosaveManager", () => {
     });
 
     it("saving -> saving_pending on schedule()", async () => {
-      let resolveSave: () => void;
+      let resolveSave: () => void = () => {};
       const savePromise = new Promise<void>((resolve) => {
         resolveSave = resolve;
       });
@@ -88,7 +88,7 @@ describe("AutosaveManager", () => {
       expect(manager.state).toBe("saving_pending");
 
       // Complete the save
-      resolveSave!();
+      resolveSave();
       await Promise.resolve(); // Let the promise resolve
 
       // Should transition to counting (not idle)
@@ -108,7 +108,7 @@ describe("AutosaveManager", () => {
     });
 
     it("saving_pending -> counting on complete (restarts timer)", async () => {
-      let resolveSave: () => void;
+      let resolveSave: () => void = () => {};
       const save = vi.fn().mockImplementation(
         () =>
           new Promise<void>((resolve) => {
@@ -127,7 +127,7 @@ describe("AutosaveManager", () => {
       expect(manager.state).toBe("saving_pending");
 
       // Complete save
-      resolveSave!();
+      resolveSave();
       await Promise.resolve();
 
       // Should restart timer
@@ -142,7 +142,7 @@ describe("AutosaveManager", () => {
     });
 
     it("saving_pending -> saving_pending on schedule() (no-op)", async () => {
-      let resolveSave: () => void;
+      let resolveSave: () => void = () => {};
       const savePromise = new Promise<void>((resolve) => {
         resolveSave = resolve;
       });
@@ -157,7 +157,7 @@ describe("AutosaveManager", () => {
 
       expect(manager.state).toBe("saving_pending");
 
-      resolveSave!();
+      resolveSave();
       await Promise.resolve();
 
       // Should only restart timer once
@@ -175,7 +175,7 @@ describe("AutosaveManager", () => {
     });
 
     it("cancels pending re-save but lets current save complete", async () => {
-      let resolveSave: () => void;
+      let resolveSave: () => void = () => {};
       const save = vi.fn().mockImplementation(
         () =>
           new Promise<void>((resolve) => {
@@ -191,7 +191,7 @@ describe("AutosaveManager", () => {
 
       expect(manager.state).toBe("saving");
 
-      resolveSave!();
+      resolveSave();
       await Promise.resolve();
 
       // Should go to idle (not counting, because we cancelled pending)
@@ -225,7 +225,7 @@ describe("AutosaveManager", () => {
     });
 
     it("waits for current save when saving", async () => {
-      let resolveSave: () => void;
+      let resolveSave: () => void = () => {};
       const save = vi.fn().mockImplementation(
         () =>
           new Promise<void>((resolve) => {
@@ -249,7 +249,7 @@ describe("AutosaveManager", () => {
       expect(flushed).toBe(false);
 
       // Complete the save
-      resolveSave!();
+      resolveSave();
       await flushPromise;
 
       expect(flushed).toBe(true);
@@ -257,7 +257,7 @@ describe("AutosaveManager", () => {
     });
 
     it("handles saving_pending by waiting for both saves", async () => {
-      let resolveSave: () => void;
+      let resolveSave: () => void = () => {};
       let saveCount = 0;
       const save = vi.fn().mockImplementation(() => {
         saveCount++;
@@ -280,7 +280,7 @@ describe("AutosaveManager", () => {
       const flushPromise = manager.flush();
 
       // Complete first save - need to let all microtasks settle
-      resolveSave!();
+      resolveSave();
       await vi.advanceTimersByTimeAsync(0);
 
       // Now flush() should have started the second save
@@ -288,7 +288,7 @@ describe("AutosaveManager", () => {
       expect(manager.state).toBe("saving");
 
       // Complete second save
-      resolveSave!();
+      resolveSave();
       await flushPromise;
 
       expect(manager.state).toBe("idle");
@@ -310,7 +310,7 @@ describe("AutosaveManager", () => {
     });
 
     it("calls onAfterSave after each save in saving_pending scenario", async () => {
-      let resolveSave: () => void;
+      let resolveSave: () => void = () => {};
       const save = vi.fn().mockImplementation(
         () =>
           new Promise<void>((resolve) => {
@@ -324,12 +324,12 @@ describe("AutosaveManager", () => {
       vi.advanceTimersByTime(1000);
       manager.schedule(); // -> saving_pending
 
-      resolveSave!();
+      resolveSave();
       await Promise.resolve();
       expect(onAfterSave).toHaveBeenCalledTimes(1);
 
       vi.advanceTimersByTime(1000);
-      resolveSave!();
+      resolveSave();
       await Promise.resolve();
       expect(onAfterSave).toHaveBeenCalledTimes(2);
     });
@@ -362,7 +362,7 @@ describe("AutosaveManager", () => {
     });
 
     it("transitions to counting on save error when saving_pending", async () => {
-      let rejectSave: (e: Error) => void;
+      let rejectSave: (e: Error) => void = () => {};
       const save = vi.fn().mockImplementation(
         () =>
           new Promise<void>((_, reject) => {
@@ -375,7 +375,7 @@ describe("AutosaveManager", () => {
       vi.advanceTimersByTime(1000);
       manager.schedule(); // -> saving_pending
 
-      rejectSave!(new Error("save failed"));
+      rejectSave(new Error("save failed"));
       await vi.advanceTimersByTimeAsync(0);
 
       // Should still respect saving_pending and restart timer

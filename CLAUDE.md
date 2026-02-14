@@ -16,6 +16,16 @@ npm run test:watch # Run tests in watch mode
 
 **When to run tests:** Run `npm test` after modifying any functions in `src/storage/` or `src/editor/`. Tests cover pure functions like `extractTitle`, `parseDataUrl`, `categorizeImageSrc`, etc. The test suite runs in ~200ms.
 
+## Code Quality Requirements
+
+Before completing any task, ensure:
+
+1. **`npm run lint`** passes with zero errors and zero warnings
+2. **`npm run build`** succeeds (includes TypeScript type checking)
+3. **`npm test`** passes with all tests green
+
+**Do not dismiss existing issues.** If you encounter lint errors, type errors, or failing tests - whether caused by your changes or pre-existing - fix them. Never say "these issues were already there" as justification for leaving them. The codebase must be clean after every change.
+
 ## Project Vision and Objectives
 
 Read README.md 

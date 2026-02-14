@@ -626,8 +626,9 @@ async function handleOpenNotebook() {
 async function saveCurrentNote() {
   if (!canSaveNote(appState)) return;
 
-  const notebook = getNotebook(appState)!;
-  const note = getNote(appState)!;
+  const notebook = getNotebook(appState);
+  const note = getNote(appState);
+  if (!notebook || !note) return;
 
   note.content = view.state.doc.toJSON();
   await saveNote(fs, notebook, note);
