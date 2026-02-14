@@ -103,6 +103,10 @@ Strict mode is enabled. The build runs `tsc` for type-checking before Vite bundl
 
 Use Node v24.12.0 (specified in `.nvmrc`).
 
+## Git Hygiene
+
+Always use `git add` with specific file paths, never blanket commands like `git add -A` or `git add .`. This prevents accidentally staging unrelated changes, generated files, or debug artifacts.
+
 ## GitHub CLI
 
 Always use `--json` with `gh issue view` to avoid GraphQL deprecation errors:
