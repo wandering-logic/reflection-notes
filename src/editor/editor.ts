@@ -27,6 +27,7 @@ import { getImageManager } from "./ImageManager";
 import { createImageNodeView } from "./imageNodeView";
 import { categorizeImageSrc, type ImageSrcType } from "./imageUtils";
 import { createMathDisplayNodeView } from "./mathNodeView";
+import { createMathPlugin } from "./mathPlugin";
 import { schema } from "./schema";
 import { normalizeTablesInSlice } from "./tableNormalize";
 
@@ -239,6 +240,7 @@ const plugins = [
   listKeymap,
   navigationKeymap,
   placeholderPlugin,
+  createMathPlugin(), // Math editing popover
   keymap(baseKeymap),
 ];
 
