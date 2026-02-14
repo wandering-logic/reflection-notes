@@ -1,32 +1,42 @@
 /**
  * NodeView for math_display nodes.
  * Renders LaTeX with KaTeX and shows a popover editor when selected.
+ *
+ * Entry methods:
+ * - Click on math block → cursor at end
+ * - Arrow down/right from above → cursor at start
+ * - Arrow up/left from below → cursor at end
+ * - Insert new block via toolbar → cursor at start (empty)
+ * - Exit from adjacent math block → cursor at start or end based on direction
+ *
+ * Exit methods:
+ * - Click elsewhere → deselect
+ * - Arrow up/left at position 0 → exit before
+ * - Arrow down/right at end → exit after
+ * - Tab → exit after
+ * - Shift-Tab → exit before
+ * - Escape → exit after
  */
 
 import katex from "katex";
 import type { Node } from "prosemirror-model";
+import { Selection } from "prosemirror-state";
 import type { EditorView } from "prosemirror-view";
 
-/**
- * NodeView for display math that renders with KaTeX and shows
- * a popover textarea when selected.
- */
 export function createMathDisplayNodeView(
   node: Node,
   view: EditorView,
   getPos: () => number | undefined,
 ) {
-  // Main container
+  // DOM structure
   const dom = document.createElement("div");
   dom.className = "math-display";
   dom.setAttribute("data-latex", node.attrs.content);
 
-  // Rendered math container
   const rendered = document.createElement("div");
   rendered.className = "math-rendered";
   dom.appendChild(rendered);
 
-  // Popover for editing (hidden by default)
   const popover = document.createElement("div");
   popover.className = "math-popover";
   popover.style.display = "none";
@@ -38,9 +48,12 @@ export function createMathDisplayNodeView(
   popover.appendChild(textarea);
   dom.appendChild(popover);
 
-  // Debounce timer for live updates
+  // State
+  let currentContent = node.attrs.content as string;
+  let isEditing = false;
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
+  // Rendering
   function renderMath(latex: string) {
     try {
       katex.render(latex || "\\text{(empty)}", rendered, {
@@ -50,8 +63,6 @@ export function createMathDisplayNodeView(
       });
       rendered.classList.remove("math-error");
     } catch (e) {
-      // KaTeX with throwOnError: false handles most errors gracefully,
-      // but we catch anything else just in case
       rendered.textContent = String(e);
       rendered.classList.add("math-error");
     }
@@ -60,80 +71,175 @@ export function createMathDisplayNodeView(
   function updateNodeContent(latex: string) {
     const pos = getPos();
     if (pos === undefined) return;
-
-    const tr = view.state.tr.setNodeMarkup(pos, undefined, {
-      content: latex,
-    });
+    const tr = view.state.tr.setNodeMarkup(pos, undefined, { content: latex });
     view.dispatch(tr);
   }
 
+  // Exit functions
+  function exitToAfter() {
+    const pos = getPos();
+    if (pos === undefined) return;
+    const nodeSize = view.state.doc.nodeAt(pos)?.nodeSize ?? 1;
+    const afterPos = pos + nodeSize;
+    const tr = view.state.tr.setSelection(
+      Selection.near(view.state.doc.resolve(afterPos)),
+    );
+    view.dispatch(tr);
+    view.focus();
+  }
+
+  function exitToBefore() {
+    const pos = getPos();
+    if (pos === undefined) return;
+    const tr = view.state.tr.setSelection(
+      Selection.near(view.state.doc.resolve(pos), -1),
+    );
+    view.dispatch(tr);
+    view.focus();
+  }
+
+  // Document-level keyboard handler (capture phase)
+  // This intercepts ALL keyboard events when editing, regardless of focus
+  function handleDocumentKeydown(e: KeyboardEvent) {
+    if (!isEditing) return;
+
+    // Exit keys
+    if (e.key === "Escape") {
+      e.preventDefault();
+      e.stopPropagation();
+      exitToAfter();
+      return;
+    }
+
+    if (e.key === "Tab") {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.shiftKey) {
+        exitToBefore();
+      } else {
+        exitToAfter();
+      }
+      return;
+    }
+
+    // Arrow exits at boundaries
+    if (e.key === "ArrowUp" || e.key === "ArrowLeft") {
+      if (textarea.selectionStart === 0 && textarea.selectionEnd === 0) {
+        e.preventDefault();
+        e.stopPropagation();
+        exitToBefore();
+        return;
+      }
+    }
+
+    if (e.key === "ArrowDown" || e.key === "ArrowRight") {
+      const len = textarea.value.length;
+      if (textarea.selectionStart === len && textarea.selectionEnd === len) {
+        e.preventDefault();
+        e.stopPropagation();
+        exitToAfter();
+        return;
+      }
+    }
+
+    // For all other keys: ensure textarea has focus, then let event proceed
+    if (document.activeElement !== textarea) {
+      textarea.focus();
+    }
+    // Don't prevent/stop - let the event reach the textarea naturally
+  }
+
+  // Input handler for textarea
   function handleInput() {
     const latex = textarea.value;
-
-    // Update rendered math immediately for visual feedback
     renderMath(latex);
     dom.setAttribute("data-latex", latex);
 
-    // Debounce the actual node update
     if (debounceTimer) clearTimeout(debounceTimer);
     debounceTimer = setTimeout(() => {
       updateNodeContent(latex);
     }, 100);
   }
 
-  function handleKeydown(e: KeyboardEvent) {
-    // Escape closes the popover
-    if (e.key === "Escape") {
-      e.preventDefault();
-      view.focus();
-    }
-  }
-
   textarea.addEventListener("input", handleInput);
-  textarea.addEventListener("keydown", handleKeydown);
 
   // Initial render
   renderMath(node.attrs.content);
 
   return {
     dom,
+
     update(updatedNode: Node) {
       if (updatedNode.type.name !== "math_display") {
         return false;
       }
-      const newContent = updatedNode.attrs.content;
-      dom.setAttribute("data-latex", newContent);
+      currentContent = updatedNode.attrs.content as string;
+      dom.setAttribute("data-latex", currentContent);
 
-      // Only re-render if content changed and we're not actively editing
-      if (popover.style.display === "none") {
-        renderMath(newContent);
+      // Only re-render if not actively editing
+      if (!isEditing) {
+        renderMath(currentContent);
       }
       return true;
     },
+
     selectNode() {
+      // Determine entry direction before we change state
+      const pos = getPos();
+      let cursorAtEnd = false;
+      if (pos !== undefined) {
+        // Check if there's text before this node (we came from above/left)
+        // by seeing if Selection.near resolves to before or after
+        // Actually, we can check the view's current selection anchor
+        // If anchor < pos, we came from before; if > pos + nodeSize, from after
+        const { anchor } = view.state.selection;
+        const nodeSize = view.state.doc.nodeAt(pos)?.nodeSize ?? 1;
+        cursorAtEnd = anchor > pos + nodeSize / 2;
+      }
+
+      isEditing = true;
       dom.classList.add("math-selected");
       popover.style.display = "block";
-      textarea.value = node.attrs.content;
-      // Focus and select all for easy replacement
+      textarea.value = currentContent;
+
+      // Add document-level keyboard interception
+      document.addEventListener("keydown", handleDocumentKeydown, true);
+
+      // Focus textarea and position cursor
       textarea.focus();
-      textarea.select();
+      if (cursorAtEnd) {
+        textarea.selectionStart = textarea.selectionEnd = textarea.value.length;
+      } else {
+        textarea.selectionStart = textarea.selectionEnd = 0;
+      }
     },
+
     deselectNode() {
+      isEditing = false;
       dom.classList.remove("math-selected");
       popover.style.display = "none";
-      // Clear any pending debounce
+
+      // Remove document-level keyboard interception
+      document.removeEventListener("keydown", handleDocumentKeydown, true);
+
       if (debounceTimer) {
         clearTimeout(debounceTimer);
         debounceTimer = null;
       }
     },
+
     stopEvent(event: Event) {
-      // Let the textarea handle its own events
+      // When editing, intercept all keyboard events (handled by document listener)
+      if (isEditing && event instanceof KeyboardEvent) {
+        return true;
+      }
+      // Also intercept events targeting the popover
       return popover.contains(event.target as globalThis.Node);
     },
+
     destroy() {
+      document.removeEventListener("keydown", handleDocumentKeydown, true);
       textarea.removeEventListener("input", handleInput);
-      textarea.removeEventListener("keydown", handleKeydown);
       if (debounceTimer) clearTimeout(debounceTimer);
     },
   };

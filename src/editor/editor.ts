@@ -613,11 +613,21 @@ export function insertHorizontalRule(view: EditorView): boolean {
 
 export function insertMathDisplay(view: EditorView): boolean {
   const { state, dispatch } = view;
+  const { $from } = state.selection;
+
+  // Find the position after the current block
+  const afterBlock = $from.after(1);
+
+  // Create the math node
   const mathNode = schema.nodes.math_display.create({ content: "" });
-  const tr = state.tr.replaceSelectionWith(mathNode);
-  // Select the new math node so the popover opens
-  const pos = tr.selection.from - 1;
-  tr.setSelection(NodeSelection.create(tr.doc, pos));
+
+  // Insert after current block
+  const tr = state.tr.insert(afterBlock, mathNode);
+
+  // Select the newly inserted math node
+  // After insert, the math node is at position afterBlock
+  tr.setSelection(NodeSelection.create(tr.doc, afterBlock));
+
   dispatch(tr);
   return true;
 }
