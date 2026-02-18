@@ -380,32 +380,24 @@ export function mountEditor(host: HTMLElement): EditorView {
         }
       }
 
-      // URL autolink: If pasted content is a URL (plain text or autolink where
-      // href equals text), create a link. The link text is either the URL itself
-      // (for empty/multi-block selection) or the selected text (for inline selection).
-      const sliceText = slice.content
-        .textBetween(0, slice.content.size, "", "")
-        .trim();
-
-      // Detect URL: either plain text URL or autolink (link mark where href === text)
+      // URL autolink: If pasted content is a single text node containing a valid
+      // URL, create a link. An "autolink" is either plain text that parses as a
+      // URL, or text with exactly one link mark where href === text (from an app
+      // that auto-linked the URL). No other marks allowed, no content outside.
       let href: string | null = null;
-      const plainUrl = parseHttpUrl(sliceText);
-      if (plainUrl) {
-        href = plainUrl.href;
-      } else {
-        // Check for autolink from another app (link mark where href === text)
-        let linkHref: string | null = null;
-        slice.content.descendants((node) => {
-          const linkMark = node.marks?.find(
-            (m) => m.type === schema.marks.link,
-          );
-          if (linkMark) {
-            linkHref = linkMark.attrs.href as string;
-            return false; // stop iteration
+      if (slice.content.childCount === 1) {
+        const node = slice.content.firstChild;
+        if (node?.isText && node.text) {
+          const url = parseHttpUrl(node.text);
+          if (
+            url &&
+            (node.marks.length === 0 ||
+              (node.marks.length === 1 &&
+                node.marks[0].type === schema.marks.link &&
+                node.marks[0].attrs.href === node.text))
+          ) {
+            href = url.href;
           }
-        });
-        if (linkHref && linkHref === sliceText) {
-          href = linkHref;
         }
       }
 
