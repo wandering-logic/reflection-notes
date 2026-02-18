@@ -6,13 +6,7 @@ import {
 } from "prosemirror-commands";
 import { history, redo, undo } from "prosemirror-history";
 import { keymap } from "prosemirror-keymap";
-import {
-  Fragment,
-  type Mark,
-  Node,
-  type NodeType,
-  Slice,
-} from "prosemirror-model";
+import { Fragment, Node, type NodeType, Slice } from "prosemirror-model";
 import {
   liftListItem,
   sinkListItem,
@@ -48,18 +42,6 @@ function isInlineSelection(state: EditorState): boolean {
   if (from === to) return false; // empty selection
   // Same parent block = inline selection
   return $from.sameParent($to);
-}
-
-/**
- * Add a mark to all nodes in a fragment of inline content.
- * Works for both text nodes and inline atoms (like images).
- */
-function addMarkToFragment(fragment: Fragment, mark: Mark): Fragment {
-  const nodes: Node[] = [];
-  fragment.forEach((node) => {
-    nodes.push(node.mark(mark.addToSet(node.marks)));
-  });
-  return Fragment.from(nodes);
 }
 
 interface ImageToProcess {
@@ -432,27 +414,17 @@ export function mountEditor(host: HTMLElement): EditorView {
         const { selection } = state;
         const linkMark = schema.marks.link.create({ href });
 
-        let linkSlice: Slice;
+        let tr: Transaction;
         if (!selection.empty && isInlineSelection(state)) {
-          // Inline selection: link text = selected content (preserving marks)
-          const { from, to } = selection;
-          const selectedSlice = state.doc.slice(from, to);
-          const linkedContent = addMarkToFragment(
-            selectedSlice.content,
-            linkMark,
-          );
-          linkSlice = new Slice(
-            linkedContent,
-            selectedSlice.openStart,
-            selectedSlice.openEnd,
-          );
+          // Inline selection: add link mark to existing content
+          tr = state.tr.addMark(selection.from, selection.to, linkMark);
         } else {
-          // Empty or multi-block selection: link text = href
+          // Empty or multi-block selection: insert href as linked text
           const linkNode = schema.text(href, [linkMark]);
-          linkSlice = new Slice(Fragment.from(linkNode), 0, 0);
+          const linkSlice = new Slice(Fragment.from(linkNode), 0, 0);
+          tr = state.tr.replaceSelection(linkSlice);
         }
 
-        const tr = state.tr.replaceSelection(linkSlice);
         tr.removeStoredMark(schema.marks.link);
         dispatch(tr);
         return true;
