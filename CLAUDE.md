@@ -145,3 +145,26 @@ Before designing solutions, enumerate the complete problem space:
 3. **Identify the coupling.** Features that seem separate often share a communication channel (clipboard, file format, API). Design them together, not as afterthoughts to each other.
 
 Only after this enumeration should you design the implementation.
+
+## Plan Documents
+
+When creating implementation plans, save them to `docs/plans/` with a ULID filename:
+
+```
+docs/plans/01KHRS817S0EERAW6NG7FZT1K6.md
+```
+
+ULIDs are time-sortable unique identifiers. Generate one with:
+
+```bash
+node -e "
+const t = Date.now();
+const chars = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+let ulid = '';
+for (let i = 0; i < 10; i++) { ulid = chars[t >> (i * 5) & 31] + ulid; }
+for (let i = 0; i < 16; i++) { ulid += chars[Math.floor(Math.random() * 32)]; }
+console.log(ulid);
+"
+```
+
+Plans should document the design decisions and rationale, not just the implementation steps. They serve as a record of why things were built a certain way.

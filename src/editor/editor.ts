@@ -28,11 +28,21 @@ import { createImageNodeView } from "./imageNodeView";
 import { categorizeImageSrc, type ImageSrcType } from "./imageUtils";
 import { createMathDisplayNodeView } from "./mathNodeView";
 import { createMathPlugin } from "./mathPlugin";
-import { schema } from "./schema";
+import { parseHttpUrl, schema } from "./schema";
 import { normalizeTablesInSlice } from "./tableNormalize";
 
 // Re-export for backward compatibility
 export { categorizeImageSrc, type ImageSrcType };
+
+/**
+ * Check if current selection is non-empty and inline (doesn't cross block boundaries).
+ */
+function isInlineSelection(state: EditorState): boolean {
+  const { from, to, $from, $to } = state.selection;
+  if (from === to) return false; // empty selection
+  // Same parent block = inline selection
+  return $from.sameParent($to);
+}
 
 interface ImageToProcess {
   node: Node;
@@ -368,6 +378,52 @@ export function mountEditor(host: HTMLElement): EditorView {
 
           return true; // Consume the paste event
         }
+      }
+
+      // URL autolink: If pasted content is a single text node containing a valid
+      // URL, create a link. An "autolink" is either plain text that parses as a
+      // URL, or text with exactly one link mark where href === text (from an app
+      // that auto-linked the URL). No other marks allowed, no content outside.
+      let href: string | null = null;
+      if (slice.content.childCount === 1) {
+        let node = slice.content.firstChild;
+        // Unwrap if single paragraph containing single child
+        if (node?.type.name === "paragraph" && node.content.childCount === 1) {
+          node = node.content.firstChild;
+        }
+        if (node?.isText && node.text) {
+          const url = parseHttpUrl(node.text);
+          if (
+            url &&
+            (node.marks.length === 0 ||
+              (node.marks.length === 1 &&
+                node.marks[0].type === schema.marks.link &&
+                node.marks[0].attrs.href === node.text))
+          ) {
+            href = url.href;
+          }
+        }
+      }
+
+      if (href) {
+        const { state, dispatch } = view;
+        const { selection } = state;
+        const linkMark = schema.marks.link.create({ href });
+
+        let tr: Transaction;
+        if (!selection.empty && isInlineSelection(state)) {
+          // Inline selection: add link mark to existing content
+          tr = state.tr.addMark(selection.from, selection.to, linkMark);
+        } else {
+          // Empty or multi-block selection: insert href as linked text
+          const linkNode = schema.text(href, [linkMark]);
+          const linkSlice = new Slice(Fragment.from(linkNode), 0, 0);
+          tr = state.tr.replaceSelection(linkSlice);
+        }
+
+        tr.removeStoredMark(schema.marks.link);
+        dispatch(tr);
+        return true;
       }
 
       // Normalize tables in pasted content to enforce GFM semantics
