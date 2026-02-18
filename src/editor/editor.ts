@@ -386,7 +386,11 @@ export function mountEditor(host: HTMLElement): EditorView {
       // that auto-linked the URL). No other marks allowed, no content outside.
       let href: string | null = null;
       if (slice.content.childCount === 1) {
-        const node = slice.content.firstChild;
+        let node = slice.content.firstChild;
+        // Unwrap if single paragraph containing single child
+        if (node?.type.name === "paragraph" && node.content.childCount === 1) {
+          node = node.content.firstChild;
+        }
         if (node?.isText && node.text) {
           const url = parseHttpUrl(node.text);
           if (
