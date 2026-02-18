@@ -51,18 +51,13 @@ function isInlineSelection(state: EditorState): boolean {
 }
 
 /**
- * Recursively add a mark to all text nodes in a fragment.
+ * Add a mark to all nodes in a fragment of inline content.
+ * Works for both text nodes and inline atoms (like images).
  */
 function addMarkToFragment(fragment: Fragment, mark: Mark): Fragment {
   const nodes: Node[] = [];
   fragment.forEach((node) => {
-    if (node.isText) {
-      nodes.push(node.mark(mark.addToSet(node.marks)));
-    } else if (node.content.size > 0) {
-      nodes.push(node.copy(addMarkToFragment(node.content, mark)));
-    } else {
-      nodes.push(node);
-    }
+    nodes.push(node.mark(mark.addToSet(node.marks)));
   });
   return Fragment.from(nodes);
 }

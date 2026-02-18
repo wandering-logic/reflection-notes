@@ -215,6 +215,16 @@ export const schema = new Schema({
         const attrs: Record<string, string> = { src, class: "pm-image" };
         if (alt) attrs.alt = alt;
         if (title) attrs.title = title;
+
+        // If image has a link mark, wrap in <a>
+        const linkMark = node.marks.find((m) => m.type.name === "link");
+        if (linkMark) {
+          return [
+            "a",
+            { href: linkMark.attrs.href, class: "pm-image-link" },
+            ["img", attrs],
+          ];
+        }
         return ["img", attrs];
       },
     },
