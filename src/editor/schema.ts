@@ -3,6 +3,44 @@ import { marks, nodes } from "prosemirror-schema-basic";
 import { bulletList, listItem, orderedList } from "prosemirror-schema-list";
 import { tableNodes } from "prosemirror-tables";
 
+/**
+ * Validate that an href is safe for use in links.
+ * Accepts http, https, and mailto URLs only.
+ * Used by parseDOM for <a> tags and paste sanitization.
+ */
+export function isSafeHref(href: string): boolean {
+  try {
+    const url = new URL(href);
+    return (
+      url.protocol === "http:" ||
+      url.protocol === "https:" ||
+      url.protocol === "mailto:"
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Parse text as an HTTP(S) URL suitable for autolink.
+ * Stricter than isSafeHref: only http/https with non-empty hostname.
+ * Returns the parsed URL if valid, null otherwise.
+ */
+export function parseHttpUrl(text: string): URL | null {
+  try {
+    const url = new URL(text);
+    if (
+      (url.protocol === "http:" || url.protocol === "https:") &&
+      url.hostname !== ""
+    ) {
+      return url;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 // Generate table node specs from prosemirror-tables
 // TODO: GFM has per-column alignment (left/center/right/none).
 // Add `alignments: Alignment[]` attr to table node when we implement alignment UI.
@@ -192,9 +230,8 @@ export const schema = new Schema({
           tag: "a[href]",
           getAttrs(dom) {
             const href = (dom as HTMLElement).getAttribute("href") || "";
-            // Only allow safe URL schemes (http, https, mailto) and relative paths
-            if (!/^(https?|mailto):/i.test(href) && !href.startsWith("/")) {
-              return false; // Reject this link
+            if (!isSafeHref(href)) {
+              return false; // Strip link, keep text
             }
             return {
               href,

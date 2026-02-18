@@ -28,7 +28,7 @@ import { createImageNodeView } from "./imageNodeView";
 import { categorizeImageSrc, type ImageSrcType } from "./imageUtils";
 import { createMathDisplayNodeView } from "./mathNodeView";
 import { createMathPlugin } from "./mathPlugin";
-import { schema } from "./schema";
+import { parseHttpUrl, schema } from "./schema";
 import { normalizeTablesInSlice } from "./tableNormalize";
 
 // Re-export for backward compatibility
@@ -368,6 +368,101 @@ export function mountEditor(host: HTMLElement): EditorView {
 
           return true; // Consume the paste event
         }
+      }
+
+      // URL autolink: If the pasted content is just a URL (without existing links),
+      // make it a link. Skip if slice already has link marks - don't override them.
+      let hasLinkMark = false;
+      slice.content.descendants((node) => {
+        if (node.marks?.some((m) => m.type === schema.marks.link)) {
+          hasLinkMark = true;
+          return false; // stop iteration
+        }
+      });
+
+      const sliceText = slice.content
+        .textBetween(0, slice.content.size, "", "")
+        .trim();
+      const url = !hasLinkMark ? parseHttpUrl(sliceText) : null;
+
+      if (url) {
+        const href = url.href;
+        const { state, dispatch } = view;
+        const { selection } = state;
+
+        if (selection.empty) {
+          // Part 1: No selection - insert URL as linked text
+          const linkMark = schema.marks.link.create({ href });
+          const textNode = schema.text(sliceText, [linkMark]);
+          const tr = state.tr.replaceSelectionWith(textNode, false);
+          // Remove stored link mark so next typed char is unlinked
+          tr.removeStoredMark(schema.marks.link);
+          dispatch(tr);
+          return true;
+        }
+        // Part 2: Selection - apply link mark to selected text
+        // Case 2b: If selection is entirely inside one existing link,
+        // extend range to cover the full link (links are atomic to users)
+        let { from, to } = selection;
+
+        // Check if selection is entirely within one link
+        const $from = state.doc.resolve(from);
+        const $to = state.doc.resolve(to);
+        const linkAtFrom = $from
+          .marks()
+          .find((m) => m.type === schema.marks.link);
+        const linkAtTo = $to.marks().find((m) => m.type === schema.marks.link);
+
+        if (
+          linkAtFrom &&
+          linkAtTo &&
+          linkAtFrom.attrs.href === linkAtTo.attrs.href
+        ) {
+          // Selection is inside one link - find full extent
+          // Walk left from 'from' to find link start
+          let extendedFrom = from;
+          for (let pos = from - 1; pos >= 0; pos--) {
+            const $pos = state.doc.resolve(pos);
+            const linkAtPos = $pos
+              .marks()
+              .find((m) => m.type === schema.marks.link);
+            if (linkAtPos && linkAtPos.attrs.href === linkAtFrom.attrs.href) {
+              extendedFrom = pos;
+            } else {
+              break;
+            }
+          }
+          // Walk right from 'to' to find link end
+          let extendedTo = to;
+          const docSize = state.doc.content.size;
+          for (let pos = to; pos <= docSize; pos++) {
+            const $pos = state.doc.resolve(pos);
+            const linkAtPos = $pos
+              .marks()
+              .find((m) => m.type === schema.marks.link);
+            if (linkAtPos && linkAtPos.attrs.href === linkAtFrom.attrs.href) {
+              extendedTo = pos + 1;
+            } else {
+              break;
+            }
+          }
+          from = extendedFrom;
+          to = extendedTo;
+        }
+
+        const tr = state.tr;
+        // Remove any existing link marks in the range first
+        tr.removeMark(from, to, schema.marks.link);
+        // Add the new link mark
+        // DESIGN NOTE: tr.addMark across a multi-block range correctly applies
+        // the mark only to inline content within each block. Images (atom nodes)
+        // within the selection are unaffected - marks only apply to text nodes.
+        tr.addMark(from, to, schema.marks.link.create({ href }));
+        // Collapse selection to end and remove stored link mark
+        tr.setSelection(Selection.near(tr.doc.resolve(tr.mapping.map(to))));
+        tr.removeStoredMark(schema.marks.link);
+        dispatch(tr);
+        return true;
       }
 
       // Normalize tables in pasted content to enforce GFM semantics
