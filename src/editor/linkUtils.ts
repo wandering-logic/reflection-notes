@@ -4,7 +4,7 @@ import type {
   Node as PMNode,
   ResolvedPos,
 } from "prosemirror-model";
-import type { Command } from "prosemirror-state";
+import type { Command, Transaction } from "prosemirror-state";
 
 /**
  * Find the contiguous range of a mark containing the given position.
@@ -100,3 +100,19 @@ export const unlinkCommand: Command = (state, dispatch) => {
   dispatch?.(state.tr.removeMark(from, to, linkType));
   return true;
 };
+
+/**
+ * Set link href on a range, replacing any existing links.
+ * Returns the transaction for chaining.
+ */
+export function setLinkHref(
+  tr: Transaction,
+  from: number,
+  to: number,
+  href: string,
+  linkType: MarkType,
+): Transaction {
+  return tr
+    .removeMark(from, to, linkType)
+    .addMark(from, to, linkType.create({ href }));
+}
