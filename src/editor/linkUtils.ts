@@ -4,6 +4,7 @@ import type {
   Node as PMNode,
   ResolvedPos,
 } from "prosemirror-model";
+import type { Command } from "prosemirror-state";
 
 /**
  * Find the contiguous range of a mark containing the given position.
@@ -81,3 +82,21 @@ export function linkSpansInRange(
 
   return spans;
 }
+
+/**
+ * Remove link marks from selection or the link at cursor.
+ */
+export const unlinkCommand: Command = (state, dispatch) => {
+  const { from, to, empty } = state.selection;
+  const linkType = state.schema.marks.link;
+
+  if (empty) {
+    const range = getLinkRange(state.doc.resolve(from), linkType);
+    if (!range) return false;
+    dispatch?.(state.tr.removeMark(range.from, range.to, linkType));
+    return true;
+  }
+  if (!state.doc.rangeHasMark(from, to, linkType)) return false;
+  dispatch?.(state.tr.removeMark(from, to, linkType));
+  return true;
+};
