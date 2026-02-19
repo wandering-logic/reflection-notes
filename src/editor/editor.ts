@@ -26,6 +26,7 @@ import { isAllowedImageType } from "../storage/image";
 import { getImageManager } from "./ImageManager";
 import { createImageNodeView } from "./imageNodeView";
 import { categorizeImageSrc, type ImageSrcType } from "./imageUtils";
+import { unlinkCommand } from "./linkUtils";
 import { createMathDisplayNodeView } from "./mathNodeView";
 import { createMathPlugin } from "./mathPlugin";
 import { parseHttpUrl, schema } from "./schema";
@@ -149,6 +150,7 @@ const markKeymap = keymap({
   "Mod-i": toggleMark(schema.marks.em),
   "Mod-`": toggleMark(schema.marks.code),
   "Mod-Shift-`": toggleMark(schema.marks.strikethrough),
+  "Mod-Shift-k": unlinkCommand,
 });
 
 // Tab navigation from title to first block (skipping created timestamp)

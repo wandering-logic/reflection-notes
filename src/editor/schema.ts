@@ -229,10 +229,8 @@ export const schema = new Schema({
       },
     },
   },
+  // Mark order determines DOM nesting: first = outermost (lowest rank)
   marks: {
-    strong: marks.strong,
-    em: marks.em,
-    code: marks.code,
     link: {
       ...marks.link,
       parseDOM: [
@@ -262,5 +260,8 @@ export const schema = new Schema({
         return ["s", 0];
       },
     },
+    code: marks.code,
+    strong: marks.strong,
+    em: marks.em,
   },
 });
