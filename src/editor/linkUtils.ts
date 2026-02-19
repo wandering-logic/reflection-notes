@@ -1,4 +1,9 @@
-import type { Mark, MarkType, ResolvedPos } from "prosemirror-model";
+import type {
+  Mark,
+  MarkType,
+  Node as PMNode,
+  ResolvedPos,
+} from "prosemirror-model";
 
 /**
  * Find the contiguous range of a mark containing the given position.
@@ -50,4 +55,29 @@ export function getLinkRange(
       href: range.mark.attrs.href as string,
     }
   );
+}
+
+/**
+ * Find all distinct link spans overlapping the given range.
+ * Each span is returned with its full extent (not clipped to the query range).
+ */
+export function linkSpansInRange(
+  doc: PMNode,
+  from: number,
+  to: number,
+  linkType: MarkType,
+): { from: number; to: number; href: string }[] {
+  const spans: { from: number; to: number; href: string }[] = [];
+  const seen = new Set<number>();
+
+  doc.nodesBetween(from, to, (node, pos) => {
+    if (!node.isText || !node.marks.some((m) => m.type === linkType)) return;
+    const range = getLinkRange(doc.resolve(pos), linkType);
+    if (range && !seen.has(range.from)) {
+      seen.add(range.from);
+      spans.push(range);
+    }
+  });
+
+  return spans;
 }
