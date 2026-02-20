@@ -262,56 +262,6 @@ const changeListeners = new WeakMap<EditorView, () => void>();
 // Selection change listeners per view
 const selectionListeners = new WeakMap<EditorView, () => void>();
 
-/**
- * Insert a slice into the document, handling block vs inline content.
- * Used after transforming images in pasted HTML.
- */
-function insertSlice(view: EditorView, slice: Slice): void {
-  const { state } = view;
-
-  // Check if slice contains block-level nodes
-  let hasBlockContent = false;
-  slice.content.forEach((node) => {
-    if (node.isBlock) hasBlockContent = true;
-  });
-
-  if (!hasBlockContent) {
-    // Just insert inline content
-    const tr = state.tr;
-    tr.replaceSelection(slice);
-    view.dispatch(tr);
-    return;
-  }
-
-  // Transform title nodes to section level 1 for body paste
-  const transformedNodes: Node[] = [];
-  slice.content.forEach((node) => {
-    if (node.type.name === "title") {
-      transformedNodes.push(
-        schema.nodes.section.create({ level: 1 }, node.content),
-      );
-    } else {
-      transformedNodes.push(node);
-    }
-  });
-
-  const tr = state.tr;
-  const { $from } = state.selection;
-  const currentBlock = $from.node(1);
-  const beforeBlock = $from.before(1);
-  const afterBlock = $from.after(1);
-
-  if (currentBlock.content.size === 0) {
-    tr.replaceWith(beforeBlock, afterBlock, transformedNodes);
-  } else {
-    tr.insert(afterBlock, transformedNodes);
-  }
-
-  const insertEnd = tr.mapping.map(afterBlock);
-  tr.setSelection(Selection.near(tr.doc.resolve(insertEnd)));
-  view.dispatch(tr);
-}
-
 export function mountEditor(host: HTMLElement): EditorView {
   // Create initial document with current timestamp
   const doc = schema.nodes.doc.create(null, [
@@ -340,6 +290,30 @@ export function mountEditor(host: HTMLElement): EditorView {
         const listener = selectionListeners.get(view);
         if (listener) listener();
       }
+    },
+    transformPasted(slice) {
+      // Normalize tables to enforce GFM semantics
+      slice = normalizeTablesInSlice(slice, schema);
+
+      // Convert title nodes to section level 1 (e.g., <h1> from web pages)
+      let needsTransform = false;
+      slice.content.forEach((node) => {
+        if (node.type.name === "title") needsTransform = true;
+      });
+
+      if (needsTransform) {
+        const nodes: Node[] = [];
+        slice.content.forEach((node) => {
+          if (node.type.name === "title") {
+            nodes.push(schema.nodes.section.create({ level: 1 }, node.content));
+          } else {
+            nodes.push(node);
+          }
+        });
+        slice = new Slice(Fragment.from(nodes), slice.openStart, slice.openEnd);
+      }
+
+      return slice;
     },
     handlePaste(view, event, slice) {
       const manager = getImageManager(view);
@@ -428,10 +402,6 @@ export function mountEditor(host: HTMLElement): EditorView {
         return true;
       }
 
-      // Normalize tables in pasted content to enforce GFM semantics
-      // (flatten spanning cells, ensure first row is header cells)
-      slice = normalizeTablesInSlice(slice, schema);
-
       // Check for images in HTML content that need processing
       const imagesToProcess = findImagesToProcess(slice);
       if (imagesToProcess.length > 0 && manager) {
@@ -484,95 +454,14 @@ export function mountEditor(host: HTMLElement): EditorView {
         // Wait for fast images, then insert transformed slice
         Promise.all(fastPromises).then(() => {
           const transformedSlice = transformSliceImages(slice, srcMap);
-          insertSlice(view, transformedSlice);
+          view.dispatch(view.state.tr.replaceSelection(transformedSlice));
         });
 
         return true; // Consume the paste event
       }
 
-      // Check if slice contains block-level nodes
-      let hasBlockContent = false;
-      slice.content.forEach((node) => {
-        if (node.isBlock) hasBlockContent = true;
-      });
-
-      if (!hasBlockContent) {
-        return false; // Inline content - use default handling
-      }
-
-      const { state, dispatch } = view;
-      const { $from } = state.selection;
-      const docIndex = $from.index(0);
-
-      // Pasting into title - extract inline content only, filtering out images
-      if (docIndex === 0) {
-        // Collect all inline content from pasted blocks, excluding images
-        const inlineNodes: Node[] = [];
-        slice.content.forEach((node) => {
-          if (node.isBlock) {
-            // Extract inline content from blocks
-            node.content.forEach((child) => {
-              if (child.type.name !== "image") {
-                inlineNodes.push(child);
-              }
-            });
-          } else if (node.type.name !== "image") {
-            inlineNodes.push(node);
-          }
-        });
-
-        if (inlineNodes.length === 0) {
-          return false;
-        }
-
-        const tr = state.tr;
-        tr.replaceSelection(new Slice(Fragment.from(inlineNodes), 0, 0));
-        dispatch(tr);
-        return true;
-      }
-
-      // In created node - don't allow paste
-      if (docIndex === 1) {
-        return true; // Consume the event but do nothing
-      }
-
-      // Pasting into body - transform title nodes to section level 1
-      const transformedNodes: Node[] = [];
-      slice.content.forEach((node) => {
-        if (node.type.name === "title") {
-          // Convert to section level 1, preserving inline content
-          transformedNodes.push(
-            schema.nodes.section.create({ level: 1 }, node.content),
-          );
-        } else {
-          transformedNodes.push(node);
-        }
-      });
-
-      // Only handle collapsed selection for now
-      if (!state.selection.empty) {
-        return false;
-      }
-
-      const tr = state.tr;
-      const currentBlock = $from.node(1);
-      const beforeBlock = $from.before(1);
-      const afterBlock = $from.after(1);
-
-      if (currentBlock.content.size === 0) {
-        // Empty block - replace it with pasted content
-        tr.replaceWith(beforeBlock, afterBlock, transformedNodes);
-      } else {
-        // Non-empty block - insert pasted content after it
-        tr.insert(afterBlock, transformedNodes);
-      }
-
-      // Move cursor to end of inserted content
-      const insertEnd = tr.mapping.map(afterBlock);
-      tr.setSelection(Selection.near(tr.doc.resolve(insertEnd)));
-
-      dispatch(tr);
-      return true;
+      // Let ProseMirror handle all other cases
+      return false;
     },
   });
   return view;
