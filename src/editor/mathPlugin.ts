@@ -63,11 +63,19 @@ export function createMathPlugin(): Plugin<MathPluginState> {
 
     const { state } = editorView;
     const node = state.doc.nodeAt(editingPos);
-    if (!node || node.type.name !== "math_display") return;
+    if (
+      !node ||
+      (node.type.name !== "math_display" && node.type.name !== "math_inline")
+    )
+      return;
 
     const tr = state.tr.setNodeMarkup(editingPos, undefined, {
       content: latex,
     });
+    // setNodeMarkup creates a new node object, which breaks NodeSelection's
+    // identity check for inline nodes (block nodes are unaffected). Re-assert
+    // the NodeSelection so the plugin keeps the popover open.
+    tr.setSelection(NodeSelection.create(tr.doc, editingPos));
     editorView.dispatch(tr);
   }
 
@@ -76,15 +84,16 @@ export function createMathPlugin(): Plugin<MathPluginState> {
 
     editingPos = pos;
 
-    // Position the popover near the math node
+    // Position the popover near the math node.
+    // Use position:fixed + viewport coords so the result is independent of
+    // the popover's offset parent and any scroll offset in the editor host.
     const nodeDOM = view.nodeDOM(pos);
     if (nodeDOM instanceof HTMLElement) {
       const rect = nodeDOM.getBoundingClientRect();
-      const editorRect = view.dom.getBoundingClientRect();
 
-      popover.style.position = "absolute";
-      popover.style.left = `${rect.left - editorRect.left}px`;
-      popover.style.top = `${rect.bottom - editorRect.top + 4}px`;
+      popover.style.position = "fixed";
+      popover.style.left = `${rect.left}px`;
+      popover.style.top = `${rect.bottom + 4}px`;
       popover.style.display = "block";
 
       // Add selected class to the math node
@@ -244,7 +253,10 @@ export function createMathPlugin(): Plugin<MathPluginState> {
           // Check if NodeSelection on math_display
           if (selection instanceof NodeSelection) {
             const node = selection.node;
-            if (node.type.name === "math_display") {
+            if (
+              node.type.name === "math_display" ||
+              node.type.name === "math_inline"
+            ) {
               const pos = selection.from;
 
               // If already editing this node, just update content if changed externally
@@ -262,8 +274,13 @@ export function createMathPlugin(): Plugin<MathPluginState> {
             }
           }
 
-          // Selection changed away from math node
-          if (editingPos !== null) {
+          // Selection changed away from math node.
+          // Don't hide if the textarea still owns focus: ProseMirror's
+          // delayed selection sync (triggered by clicking an atom node)
+          // reads the browser selection after focus moved to the textarea
+          // and resets the NodeSelection to a TextSelection. That's spurious —
+          // the user is still editing.
+          if (editingPos !== null && document.activeElement !== textarea) {
             hidePopover();
           }
         },

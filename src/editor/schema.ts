@@ -163,6 +163,30 @@ export const schema = new Schema({
         ];
       },
     },
+    math_inline: {
+      inline: true,
+      atom: true,
+      attrs: { content: { default: "", validate: "string" } },
+      group: "inline",
+      selectable: true,
+      draggable: true,
+      parseDOM: [
+        {
+          tag: "span.math-inline",
+          getAttrs(dom) {
+            return {
+              content: (dom as HTMLElement).getAttribute("data-latex") || "",
+            };
+          },
+        },
+      ],
+      toDOM(node) {
+        return [
+          "span",
+          { class: "math-inline", "data-latex": node.attrs.content },
+        ];
+      },
+    },
     bullet_list: {
       ...bulletList,
       content: "list_item+",
