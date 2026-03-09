@@ -421,9 +421,20 @@ body {
   font-size: 0.9em;
 }
 
+/* Math inline node */
+.ProseMirror .math-inline {
+  display: inline;
+  cursor: pointer;
+  border-radius: 2px;
+}
+.ProseMirror .math-inline.math-selected {
+  outline: 2px solid #007bff;
+  outline-offset: 1px;
+}
+
 /* Math popover for editing (positioned by mathPlugin.ts) */
 .math-popover {
-  position: absolute;
+  position: fixed;
   min-width: 300px;
   max-width: 600px;
   padding: 8px;

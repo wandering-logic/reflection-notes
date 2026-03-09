@@ -27,7 +27,10 @@ import { getImageManager } from "./ImageManager";
 import { createImageNodeView } from "./imageNodeView";
 import { categorizeImageSrc, type ImageSrcType } from "./imageUtils";
 import { unlinkCommand } from "./linkUtils";
-import { createMathDisplayNodeView } from "./mathNodeView";
+import {
+  createMathDisplayNodeView,
+  createMathInlineNodeView,
+} from "./mathNodeView";
 import { createMathPlugin } from "./mathPlugin";
 import { parseHttpUrl, schema } from "./schema";
 import { normalizeTablesInSlice } from "./tableNormalize";
@@ -276,6 +279,7 @@ export function mountEditor(host: HTMLElement): EditorView {
     nodeViews: {
       image: createImageNodeView,
       math_display: createMathDisplayNodeView,
+      math_inline: createMathInlineNodeView,
     },
     dispatchTransaction(tr) {
       const newState = view.state.apply(tr);
@@ -296,20 +300,17 @@ export function mountEditor(host: HTMLElement): EditorView {
       slice = normalizeTablesInSlice(slice, schema);
 
       // Convert title nodes to section level 1 (e.g., <h1> from web pages)
-      let needsTransform = false;
+      let changed = false;
+      const nodes: Node[] = [];
       slice.content.forEach((node) => {
-        if (node.type.name === "title") needsTransform = true;
+        if (node.type.name === "title") {
+          nodes.push(schema.nodes.section.create({ level: 1 }, node.content));
+          changed = true;
+        } else {
+          nodes.push(node);
+        }
       });
-
-      if (needsTransform) {
-        const nodes: Node[] = [];
-        slice.content.forEach((node) => {
-          if (node.type.name === "title") {
-            nodes.push(schema.nodes.section.create({ level: 1 }, node.content));
-          } else {
-            nodes.push(node);
-          }
-        });
+      if (changed) {
         slice = new Slice(Fragment.from(nodes), slice.openStart, slice.openEnd);
       }
 
@@ -420,11 +421,7 @@ export function mountEditor(host: HTMLElement): EditorView {
           const placeholderSrc = `placeholder:loading-${Date.now()}-${Math.random().toString(36).slice(2)}`;
           srcMap.set(img.src, placeholderSrc);
 
-          // Determine source type for ImageManager
-          const source =
-            img.srcType === "blob"
-              ? { type: "remoteUrl" as const, url: img.src } // Blob URLs can be fetched
-              : { type: "remoteUrl" as const, url: img.src };
+          const source = { type: "remoteUrl" as const, url: img.src };
 
           manager
             .ingest(source)
@@ -577,6 +574,16 @@ export function insertMathDisplay(view: EditorView): boolean {
   // After insert, the math node is at position afterBlock
   tr.setSelection(NodeSelection.create(tr.doc, afterBlock));
 
+  dispatch(tr);
+  return true;
+}
+
+export function insertMathInline(view: EditorView): boolean {
+  const { state, dispatch } = view;
+  const mathNode = schema.nodes.math_inline.create({ content: "" });
+  const insertPos = state.selection.from;
+  const tr = state.tr.replaceSelectionWith(mathNode);
+  tr.setSelection(NodeSelection.create(tr.doc, insertPos));
   dispatch(tr);
   return true;
 }

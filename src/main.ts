@@ -145,6 +145,7 @@ app.innerHTML = `
          tb-blockquote: blockquote
          tb-bullet-list: list
          tb-ordered-list: list-numbers
+         tb-math-inline: superscript
     -->
     <div class="toolbar" id="toolbar">
       <div class="toolbar-group">
@@ -216,6 +217,9 @@ app.innerHTML = `
         </button>
         <button class="toolbar-btn" id="tb-math" title="Math Block">
           <svg viewBox="0 0 24 24"><path d="M19 5h-7l-4 14l-3 -6h-2"/><path d="M14 13l6 6"/><path d="M14 19l6 -6"/></svg>
+        </button>
+        <button class="toolbar-btn" id="tb-math-inline" title="Inline Math">
+          <svg viewBox="0 0 24 24"><path d="M5 7l8 10m-8 0l8 -10"/><path d="M17 10h2a1 1 0 0 1 1 1v1a1 1 0 0 1 -1 1h-1a1 1 0 0 0 -1 1v1a1 1 0 0 0 1 1h2"/></svg>
         </button>
       </div>
     </div>
@@ -451,6 +455,11 @@ document.querySelector("#tb-hr")?.addEventListener("click", () => {
 
 document.querySelector("#tb-math")?.addEventListener("click", () => {
   Editor.insertMathDisplay(view);
+  view.focus();
+});
+
+document.querySelector("#tb-math-inline")?.addEventListener("click", () => {
+  Editor.insertMathInline(view);
   view.focus();
 });
 
