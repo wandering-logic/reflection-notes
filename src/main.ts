@@ -173,6 +173,12 @@ app.innerHTML = `
         <button class="toolbar-btn" id="tb-link" title="Link">
           <svg viewBox="0 0 24 24"><path d="M9 15l6 -6"/><path d="M11 6l.463 -.536a5 5 0 0 1 7.071 7.072l-.534 .464"/><path d="M13 18l-.397 .534a5.068 5.068 0 0 1 -7.127 0a4.972 4.972 0 0 1 0 -7.071l.524 -.463"/></svg>
         </button>
+        <button class="toolbar-btn" id="tb-image" title="Image">
+          <svg viewBox="0 0 24 24"><path d="M15 8h.01"/><path d="M3 6a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v12a3 3 0 0 1 -3 3h-12a3 3 0 0 1 -3 -3v-12z"/><path d="M3 16l5 -5c.928 -.893 2.072 -.893 3 0l5 5"/><path d="M14 14l1 -1c.928 -.893 2.072 -.893 3 0l3 3"/></svg>
+        </button>
+        <button class="toolbar-btn" id="tb-math-inline" title="Inline Math">
+          <svg viewBox="0 0 24 24"><path d="M5 7l8 10m-8 0l8 -10"/><path d="M17 10h2a1 1 0 0 1 1 1v1a1 1 0 0 1 -1 1h-1a1 1 0 0 0 -1 1v1a1 1 0 0 0 1 1h2"/></svg>
+        </button>
       </div>
       <div class="toolbar-separator"></div>
       <div class="toolbar-group">
@@ -197,6 +203,9 @@ app.innerHTML = `
         <button class="toolbar-btn" id="tb-hr" title="Horizontal Rule">
           <svg viewBox="0 0 24 24"><path d="M4 12l16 0"/><path d="M8 8l4 -4l4 4"/><path d="M16 16l-4 4l-4 -4"/></svg>
         </button>
+        <button class="toolbar-btn" id="tb-math" title="Math Block">
+          <svg viewBox="0 0 24 24"><path d="M19 5h-7l-4 14l-3 -6h-2"/><path d="M14 13l6 6"/><path d="M14 19l6 -6"/></svg>
+        </button>
       </div>
       <div class="toolbar-separator"></div>
       <div class="toolbar-group">
@@ -208,18 +217,6 @@ app.innerHTML = `
         </button>
         <button class="toolbar-btn" id="tb-ordered-list" title="Ordered List">
           <svg viewBox="0 0 24 24"><path d="M11 6h9"/><path d="M11 12h9"/><path d="M12 18h8"/><path d="M4 16a2 2 0 1 1 4 0c0 .591 -.5 1 -1 1.5l-3 2.5h4"/><path d="M6 10v-6l-2 2"/></svg>
-        </button>
-      </div>
-      <div class="toolbar-separator"></div>
-      <div class="toolbar-group">
-        <button class="toolbar-btn" id="tb-image" title="Image">
-          <svg viewBox="0 0 24 24"><path d="M15 8h.01"/><path d="M3 6a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v12a3 3 0 0 1 -3 3h-12a3 3 0 0 1 -3 -3v-12z"/><path d="M3 16l5 -5c.928 -.893 2.072 -.893 3 0l5 5"/><path d="M14 14l1 -1c.928 -.893 2.072 -.893 3 0l3 3"/></svg>
-        </button>
-        <button class="toolbar-btn" id="tb-math" title="Math Block">
-          <svg viewBox="0 0 24 24"><path d="M19 5h-7l-4 14l-3 -6h-2"/><path d="M14 13l6 6"/><path d="M14 19l6 -6"/></svg>
-        </button>
-        <button class="toolbar-btn" id="tb-math-inline" title="Inline Math">
-          <svg viewBox="0 0 24 24"><path d="M5 7l8 10m-8 0l8 -10"/><path d="M17 10h2a1 1 0 0 1 1 1v1a1 1 0 0 1 -1 1h-1a1 1 0 0 0 -1 1v1a1 1 0 0 0 1 1h2"/></svg>
         </button>
       </div>
     </div>
