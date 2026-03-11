@@ -154,6 +154,16 @@ const markKeymap = keymap({
   "Mod-`": toggleMark(schema.marks.code),
   "Mod-Shift-`": toggleMark(schema.marks.strikethrough),
   "Mod-Shift-k": unlinkCommand,
+  "Shift-Enter": (state, dispatch) => {
+    if (dispatch) {
+      dispatch(
+        state.tr
+          .replaceSelectionWith(schema.nodes.hard_break.create())
+          .scrollIntoView(),
+      );
+    }
+    return true;
+  },
 });
 
 // Tab navigation from title to first block (skipping created timestamp)
