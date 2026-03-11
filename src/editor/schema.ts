@@ -206,6 +206,10 @@ export const schema = new Schema({
     table_row: tableNodeSpecs.table_row,
     table_cell: tableNodeSpecs.table_cell,
     table_header: tableNodeSpecs.table_header,
+    hard_break: {
+      ...nodes.hard_break,
+      group: "inline",
+    },
     // text is both "inline" and "text_content" (title allows text_content only)
     text: {
       ...nodes.text,
