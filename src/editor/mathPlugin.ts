@@ -1,7 +1,7 @@
 /**
  * Math editing plugin.
  *
- * This plugin manages a popover for editing math_display nodes.
+ * This plugin manages a popover for editing math_display and math_inline nodes.
  * The key insight: handleKeyDown runs BEFORE ProseMirror's default
  * handling, so we can intercept all keys when editing.
  *
@@ -12,8 +12,13 @@
  * - Handle exit (Escape, Tab, arrows at boundary)
  */
 
+import type { Node as PmNode } from "prosemirror-model";
 import { NodeSelection, Plugin, PluginKey, Selection } from "prosemirror-state";
 import type { EditorView } from "prosemirror-view";
+
+function isMathNode(node: PmNode): boolean {
+  return node.type.name === "math_display" || node.type.name === "math_inline";
+}
 
 export const mathPluginKey = new PluginKey<MathPluginState>("mathEdit");
 
@@ -63,11 +68,7 @@ export function createMathPlugin(): Plugin<MathPluginState> {
 
     const { state } = editorView;
     const node = state.doc.nodeAt(editingPos);
-    if (
-      !node ||
-      (node.type.name !== "math_display" && node.type.name !== "math_inline")
-    )
-      return;
+    if (!node || !isMathNode(node)) return;
 
     const tr = state.tr.setNodeMarkup(editingPos, undefined, {
       content: latex,
@@ -250,13 +251,9 @@ export function createMathPlugin(): Plugin<MathPluginState> {
         update(view, _prevState) {
           const { selection } = view.state;
 
-          // Check if NodeSelection on math_display
           if (selection instanceof NodeSelection) {
             const node = selection.node;
-            if (
-              node.type.name === "math_display" ||
-              node.type.name === "math_inline"
-            ) {
+            if (isMathNode(node)) {
               const pos = selection.from;
 
               // If already editing this node, just update content if changed externally
@@ -280,7 +277,11 @@ export function createMathPlugin(): Plugin<MathPluginState> {
           // reads the browser selection after focus moved to the textarea
           // and resets the NodeSelection to a TextSelection. That's spurious —
           // the user is still editing.
-          if (editingPos !== null && document.activeElement !== textarea) {
+          if (
+            editingPos !== null &&
+            textarea &&
+            document.activeElement !== textarea
+          ) {
             hidePopover();
           }
         },
