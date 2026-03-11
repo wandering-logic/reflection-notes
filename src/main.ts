@@ -135,6 +135,8 @@ app.innerHTML = `
          tb-code: code
          tb-strikethrough: strikethrough
          tb-link: link
+         tb-image: photo
+         tb-math-inline: math
          tb-paragraph: pilcrow
          tb-h1: custom (seriffed H, not Tabler's h-1 which has the digit)
          tb-h2: h-3
@@ -142,10 +144,10 @@ app.innerHTML = `
          tb-h4: h-5
          tb-code-block: source-code
          tb-hr: separator-horizontal
+         tb-math: math-integral-x
          tb-blockquote: blockquote
          tb-bullet-list: list
          tb-ordered-list: list-numbers
-         tb-math-inline: superscript
     -->
     <div class="toolbar" id="toolbar">
       <div class="toolbar-group">
@@ -177,7 +179,7 @@ app.innerHTML = `
           <svg viewBox="0 0 24 24"><path d="M15 8h.01"/><path d="M3 6a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v12a3 3 0 0 1 -3 3h-12a3 3 0 0 1 -3 -3v-12z"/><path d="M3 16l5 -5c.928 -.893 2.072 -.893 3 0l5 5"/><path d="M14 14l1 -1c.928 -.893 2.072 -.893 3 0l3 3"/></svg>
         </button>
         <button class="toolbar-btn" id="tb-math-inline" title="Inline Math">
-          <svg viewBox="0 0 24 24"><path d="M5 7l8 10m-8 0l8 -10"/><path d="M17 10h2a1 1 0 0 1 1 1v1a1 1 0 0 1 -1 1h-1a1 1 0 0 0 -1 1v1a1 1 0 0 0 1 1h2"/></svg>
+          <svg viewBox="0 0 24 24"><path d="M19 5h-7l-4 14l-3 -6h-2"/><path d="M14 13l6 6"/><path d="M14 19l6 -6"/></svg>
         </button>
       </div>
       <div class="toolbar-separator"></div>
@@ -204,7 +206,7 @@ app.innerHTML = `
           <svg viewBox="0 0 24 24"><path d="M4 12l16 0"/><path d="M8 8l4 -4l4 4"/><path d="M16 16l-4 4l-4 -4"/></svg>
         </button>
         <button class="toolbar-btn" id="tb-math" title="Math Block">
-          <svg viewBox="0 0 24 24"><path d="M19 5h-7l-4 14l-3 -6h-2"/><path d="M14 13l6 6"/><path d="M14 19l6 -6"/></svg>
+          <svg viewBox="0 0 24 24"><path d="M3 19a2 2 0 0 0 2 2c2 0 2 -4 3 -9s1 -9 3 -9a2 2 0 0 1 2 2"/><path d="M14 12l6 6"/><path d="M14 18l6 -6"/></svg>
         </button>
       </div>
       <div class="toolbar-separator"></div>
