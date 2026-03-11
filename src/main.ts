@@ -230,7 +230,6 @@ app.innerHTML = `
       </aside>
 
       <main class="editor-host">
-        <div class="format-indicator" id="format-indicator"></div>
         <div id="editor"></div>
       </main>
     </div>
@@ -787,16 +786,6 @@ Editor.onChange(view, () => {
   }
 });
 
-// Update format indicator when selection changes
-const formatIndicator =
-  document.querySelector<HTMLDivElement>("#format-indicator");
-
-function updateFormatIndicator() {
-  if (formatIndicator) {
-    formatIndicator.textContent = Editor.getBlockTypeName(view);
-  }
-}
-
 // Toolbar state tracking
 const tbBold = document.querySelector<HTMLButtonElement>("#tb-bold");
 const tbItalic = document.querySelector<HTMLButtonElement>("#tb-italic");
@@ -846,10 +835,8 @@ function updateToolbarState() {
 }
 
 Editor.onSelectionChange(view, () => {
-  updateFormatIndicator();
   updateToolbarState();
 });
-updateFormatIndicator();
 updateToolbarState();
 
 // Startup: try to restore previous notebook
