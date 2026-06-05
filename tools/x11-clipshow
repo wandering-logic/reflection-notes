@@ -1,0 +1,70 @@
+#!/usr/bin/env python3
+import argparse
+import sys
+
+import gi
+gi.require_version("Gtk", "3.0")
+from gi.repository import Gtk, Gdk
+
+
+def get_clipboard(use_primary: bool) -> Gtk.Clipboard:
+    sel = Gdk.SELECTION_PRIMARY if use_primary else Gdk.SELECTION_CLIPBOARD
+    return Gtk.Clipboard.get(sel)
+
+
+def list_targets(cb: Gtk.Clipboard) -> list[str]:
+    ok, targets = cb.wait_for_targets()
+    if not ok or targets is None:
+        return []
+    return sorted(t.name() for t in targets)
+
+
+def dump_target(cb: Gtk.Clipboard, target: str) -> int:
+    atom = Gdk.Atom.intern(target, False)
+    sd = cb.wait_for_contents(atom)
+    if sd is None:
+        print(f"error: target not available (or owner didn't provide it): {target}", file=sys.stderr)
+        return 2
+    data = sd.get_data()
+    if data is None:
+        return 0
+    # Write raw bytes to stdout
+    sys.stdout.buffer.write(data)
+    return 0
+
+
+def main() -> int:
+    p = argparse.ArgumentParser(
+        prog="gtkclip",
+        description="Inspect X11 clipboard/primary targets and dump a specific target via GTK.",
+    )
+    p.add_argument("--primary", action="store_true", help="Use PRIMARY selection (default: CLIPBOARD).")
+    p.add_argument("--target", metavar="TARGET", help="Dump the given TARGET to stdout (raw bytes).")
+
+    args = p.parse_args()
+    cb = get_clipboard(args.primary)
+
+    targets = list_targets(cb)
+
+    if args.target is None:
+        which = "PRIMARY" if args.primary else "CLIPBOARD"
+        if not targets:
+            print(f"{which}: (no targets / no owner)", file=sys.stderr)
+            return 1
+        for t in targets:
+            print(t)
+        return 0
+
+    # If dumping, enforce “only if advertised”
+    if args.target not in targets:
+        avail = "\n".join(targets) if targets else "(none)"
+        print(f"error: {args.target} not advertised by current owner.", file=sys.stderr)
+        print("available targets:", file=sys.stderr)
+        print(avail, file=sys.stderr)
+        return 2
+
+    return dump_target(cb, args.target)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
